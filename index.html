@@ -1,6 +1,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Rotatable Leaflet Map</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-rotate@0.1.2/dist/leaflet-rotate.css" />
@@ -588,6 +589,112 @@
             display: flex;
             align-items: center;
             gap: 5px;
+        }
+
+        /* Mobile-specific responsive adjustments */
+        @media (max-width: 768px) {
+            body, html {
+                font-size: 14px; /* Slightly smaller base font */
+            }
+
+            #rotation-control {
+                bottom: 10px;
+                left: 50%;
+                width: 90%;
+                max-width: none;
+            }
+
+            #add-marker-button, #marker-list-toggle {
+                padding: 12px 15px;
+                font-size: 14px;
+            }
+
+            .context-menu {
+                width: 95%;
+                max-width: 95%;
+                max-height: 90%;
+                margin: 5% auto;
+                position: fixed;
+                left: 50%;
+                transform: translateX(-50%);
+            }
+
+            .context-menu-tabs .tab {
+                padding: 10px 5px;
+                font-size: 0.9em;
+            }
+
+            .modal-content {
+                width: 90%;
+                margin: 15% auto;
+                padding: 15px;
+            }
+
+            #marker-list-container {
+                width: 100%;
+                right: -100%;
+            }
+
+            #marker-list-container.visible {
+                right: 0;
+            }
+
+            .marker-input-row {
+                flex-direction: column;
+            }
+
+            .marker-input-row input {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+
+            /* Touch-friendly sizes */
+            .icon-button, .btn {
+                min-height: 44px; /* Recommended touch target size */
+                min-width: 44px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            /* Prevent zooming on input focus */
+            input, select, textarea {
+                font-size: 16px;
+            }
+        }
+
+        /* Enhanced touch interactions */
+        @media (pointer: coarse) {
+            .context-menu-tabs .tab {
+                padding: 12px 8px; /* Larger touch targets */
+            }
+
+            .marker-list-item {
+                padding: 15px;
+            }
+        }
+
+        /* Prevent text selection and highlight on touch devices */
+        body {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        /* Allow text selection for specific elements */
+        input, textarea, .details-display {
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            user-select: text;
+        }
+
+        /* Responsive map controls */
+        .leaflet-control-zoom {
+            display: none; /* Hide default zoom controls */
         }
     </style>
 </head>
