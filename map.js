@@ -158,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
   map = L.map('map', {
     center: [latitude, longitude],
     zoom: 19,
-    minZoom: 19,
+    minZoom: 16,
     maxZoom: 20.25,
     rotate: true,
     rotateControl: {
