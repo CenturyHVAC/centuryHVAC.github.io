@@ -138,6 +138,7 @@ function initializeMap() {
             map.removeLayer(layer);
           }
         });
+        markersById.clear(); // Clear the markers tracking Map
 
         // Add markers from Firebase
         data.forEach(markerData => {
@@ -205,12 +206,11 @@ function initializeMap() {
         }
       });
 
-      // Save to localStorage
+      // Save view state to localStorage only
       const mapState = {
         center: map.getCenter(),
         zoom: map.getZoom(),
-        bearing: map.getBearing(),
-        markers: markers
+        bearing: map.getBearing()
       };
       localStorage.setItem('mapProgress', JSON.stringify(mapState));
 
