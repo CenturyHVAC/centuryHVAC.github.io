@@ -142,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
   map = L.map('map', {
     center: [latitude, longitude],
     zoom: 19,
-    minZoom: 19,
+    minZoom: 18,
     maxZoom: 20.25,
     rotate: true,
     rotateControl: {
@@ -156,8 +156,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Enhanced mobile-friendly options
     bounceAtZoomLimits: false,
     touchZoom: 'center',
-    tap: false,
-    tapTolerance: 15
+    tap: true, // Enable tap events
+    tapTolerance: 20, // Increase tap tolerance for mobile
+    scrollWheelZoom: false, // Disable scroll wheel zoom to prevent accidental zooming
   });
 
   // Add defensive checks for pan and zoom events
@@ -223,12 +224,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // Prevent default touch actions on the map container
   const mapContainer = document.getElementById('map');
   mapContainer.addEventListener('touchstart', (e) => {
-    // Prevent default touch behaviors
+    // Prevent default touch behaviors that might interfere with map interactions
     e.preventDefault();
   }, { passive: false });
 
   mapContainer.addEventListener('touchmove', (e) => {
-    // Prevent default touch behaviors
     e.preventDefault();
   }, { passive: false });
 
@@ -306,21 +306,27 @@ document.addEventListener('DOMContentLoaded', () => {
   let isAddingMarker = false;
   const addMarkerButton = document.getElementById('add-marker-button');
 
-  addMarkerButton.addEventListener('click', () => {
+  addMarkerButton.addEventListener('click', (event) => {
+    event.stopPropagation(); // Prevent event from bubbling
+    
     if (!isAddingMarker) {
       // Enter "adding marker" mode
       isAddingMarker = true;
       addMarkerButton.classList.add('active');
       addMarkerButton.textContent = 'Click Map to Add Unit';
 
-      // Temporary event listener for map click
-      function onMapClick(e) {
-        // Open the multiple markers modal at the clicked location
-        rightClickPoint = e.latlng;
+      // Create a temporary click handler that works for both mouse and touch
+      function onMapInteraction(e) {
+        // Normalize the event to work with both mouse and touch
+        const latlng = map.mouseEventToLatLng(e);
+        
+        // Open the multiple markers modal at the tapped/clicked location
+        rightClickPoint = latlng;
         openMultipleMarkersModal();
         
-        // Remove this temporary event listener
-        map.off('click', onMapClick);
+        // Remove event listeners
+        map.off('click', onMapInteraction);
+        map.off('touchend', onMapInteraction);
         
         // Reset button state
         isAddingMarker = false;
@@ -328,8 +334,9 @@ document.addEventListener('DOMContentLoaded', () => {
         addMarkerButton.textContent = 'Add Unit';
       }
 
-      // Add the one-time map click listener
-      map.on('click', onMapClick);
+      // Add both click and touch event listeners
+      map.on('click', onMapInteraction);
+      map.on('touchend', onMapInteraction);
     }
   });
 
