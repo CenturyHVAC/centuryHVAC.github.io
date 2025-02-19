@@ -50,59 +50,43 @@ document.addEventListener('DOMContentLoaded', () => {
   function loadMapProgress() {
     const savedProgress = localStorage.getItem('mapProgress');
     if (savedProgress) {
-      const mapState = JSON.parse(savedProgress);
+      try {
+        const mapState = JSON.parse(savedProgress);
 
-      // Restore map view
-      map.setView(mapState.center, mapState.zoom);
-      map.setBearing(mapState.bearing);
+        // Use safe defaults and defensive checks
+        const center = mapState.center || [35.31062486972806, -81.84777052479605];
+        const zoom = mapState.zoom || 19;
+        const bearing = mapState.bearing || 163;
 
-      // Restore rotation slider
-      const rotationSlider = document.getElementById('rotation-slider');
-      const rotationDisplay = document.getElementById('rotation-display');
-      rotationSlider.value = mapState.bearing;
-      rotationDisplay.textContent = `${mapState.bearing}°`;
-
-      // Restore markers
-      mapState.markers.forEach(markerData => {
-        const marker = L.marker(markerData.latlng, {
-          draggable: false
-        }).addTo(map)
-        .on('click', function(markerEvent) {
-          markerEvent.originalEvent.stopPropagation();
-          if (!this.markerData) {
-            // Initialize marker data if it doesn't exist
-            this.markerData = {
-              unitId: markerData.markerData.unitId,
-              status: markerData.markerData.status,
-              notes: markerData.markerData.notes,
-              details: markerData.markerData.details,
-              parts: markerData.markerData.parts,
-              history: {
-                status: markerData.markerData.history.status,
-                parts: markerData.markerData.history.parts
-              }
-            };
-          }
-          currentMarker = this;
-          showContextMenu(markerEvent);
+        // Use safer map state restoration
+        map.setView(center, zoom, { 
+          animate: false, 
+          reset: true
         });
+        
+        // Safely set bearing
+        map.setBearing(bearing);
 
-        // Initialize marker data when creating the marker
-        marker.markerData = {
-          unitId: markerData.markerData.unitId,
-          status: markerData.markerData.status,
-          notes: markerData.markerData.notes,
-          details: markerData.markerData.details,
-          parts: markerData.markerData.parts,
-          history: {
-            status: markerData.markerData.history.status,
-            parts: markerData.markerData.history.parts
-          }
-        };
+        // Restore rotation slider
+        const rotationSlider = document.getElementById('rotation-slider');
+        const rotationDisplay = document.getElementById('rotation-display');
+        rotationSlider.value = bearing;
+        rotationDisplay.textContent = `${bearing}°`;
 
-        // Set marker icon based on loaded status
-        setMarkerIcon(marker);
-      });
+        // Enhanced marker restoration
+        if (mapState.markers && Array.isArray(mapState.markers)) {
+          mapState.markers.forEach(markerData => {
+            if (markerData.latlng) {
+              const marker = L.marker(markerData.latlng).addTo(map);
+              marker.markerData = markerData.markerData || {};
+            }
+          });
+        }
+
+      } catch (error) {
+        console.error('Error loading map progress:', error);
+        localStorage.removeItem('mapProgress');
+      }
     }
   }
 
@@ -154,11 +138,11 @@ document.addEventListener('DOMContentLoaded', () => {
     [latitude + latOffset, longitude + lngOffset]  // Northeast corner
   );
 
-  // Create map with rotation plugin and increased max zoom
+  // Modify map initialization to be more defensive
   map = L.map('map', {
     center: [latitude, longitude],
     zoom: 19,
-    minZoom: 16,
+    minZoom: 19,
     maxZoom: 20.25,
     rotate: true,
     rotateControl: {
@@ -167,9 +151,106 @@ document.addEventListener('DOMContentLoaded', () => {
     zoomSnap: 0.25,
     zoomDelta: 0.25,
     maxBounds: bounds,
-    maxBoundsViscosity: 1.0,  // Make the bounds absolutely solid
-    inertia: false  // Disable map inertia to prevent overshooting bounds
+    maxBoundsViscosity: 1.0,
+    inertia: false,
+    // Enhanced mobile-friendly options
+    bounceAtZoomLimits: false,
+    touchZoom: 'center',
+    tap: false,
+    tapTolerance: 15
   });
+
+  // Add defensive checks for pan and zoom events
+  map.on('movestart', (e) => {
+    try {
+      if (e && e.originalEvent) {
+        e.originalEvent.preventDefault();
+      }
+    } catch (error) {
+      console.warn('Error in movestart event:', error);
+    }
+  });
+
+  map.on('zoomstart', (e) => {
+    try {
+      if (e && e.originalEvent) {
+        e.originalEvent.preventDefault();
+      }
+    } catch (error) {
+      console.warn('Error in zoomstart event:', error);
+    }
+  });
+
+  // Enhanced touch and zoom handling
+  map.on('touchstart', (e) => {
+    try {
+      e.originalEvent?.preventDefault();
+    } catch (error) {
+      console.warn('Error in touchstart event:', error);
+    }
+  });
+
+  map.on('touchmove', (e) => {
+    try {
+      e.originalEvent?.preventDefault();
+    } catch (error) {
+      console.warn('Error in touchmove event:', error);
+    }
+  });
+
+  // Add custom touch handling
+  let touchStartTime = 0;
+  let touchStartPos = null;
+
+  map.on('touchstart', (e) => {
+    touchStartTime = Date.now();
+    touchStartPos = e.containerPoint;
+  });
+
+  map.on('touchend', (e) => {
+    const touchEndTime = Date.now();
+    const touchEndPos = e.containerPoint;
+
+    // Detect if it was a quick tap
+    if (touchStartPos && touchEndTime - touchStartTime < 200 && 
+        Math.abs(touchEndPos.x - touchStartPos.x) < 10 && 
+        Math.abs(touchEndPos.y - touchStartPos.y) < 10) {
+      // Trigger click event
+      map.fire('click', e);
+    }
+  });
+
+  // Prevent default touch actions on the map container
+  const mapContainer = document.getElementById('map');
+  mapContainer.addEventListener('touchstart', (e) => {
+    // Prevent default touch behaviors
+    e.preventDefault();
+  }, { passive: false });
+
+  mapContainer.addEventListener('touchmove', (e) => {
+    // Prevent default touch behaviors
+    e.preventDefault();
+  }, { passive: false });
+
+  // Add meta viewport tag programmatically to ensure proper mobile scaling
+  const viewportMeta = document.createElement('meta');
+  viewportMeta.name = 'viewport';
+  viewportMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
+  document.head.appendChild(viewportMeta);
+
+  // CSS modifications for mobile
+  const style = document.createElement('style');
+  style.textContent = `
+    body {
+      touch-action: none;
+      overscroll-behavior: none;
+    }
+    #map {
+      touch-action: none;
+      overscroll-behavior: none;
+    }
+  `;
+  document.head.appendChild(style);
 
   // Set initial bearing to 163 degrees
   map.setBearing(163);
@@ -438,6 +519,8 @@ document.addEventListener('DOMContentLoaded', () => {
       partReplacementDateInput.value = '';
       addPartsInput.classList.add('hidden');
       showAddPartsBtn.classList.remove('hidden');
+      editingPartIndex = -1; // Reset editing index
+      
       populatePartsList(partsList, currentMarker, editingPartIndex, partNameInput, partNumberInput, partReplacementDateInput, addPartsInput, showAddPartsBtn, saveNewPartBtn);
       updatePartsHistory(partsHistoryContainer, currentMarker);
       saveMapProgress(); // Save state after updating parts

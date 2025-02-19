@@ -456,11 +456,11 @@
         #marker-list-container {
             position: absolute;
             top: 0;
-            right: -350px; /* Hidden by default, on the right side */
-            width: 350px;
+            right: -15%; 
+            width: 15%; 
             height: 100%;
             background-color: rgba(255, 255, 255, 0.95);
-            border-radius: 10px 0 0 10px; /* Rounded on the left side */
+            border-radius: 10px 0 0 10px; 
             box-shadow: -2px 0 10px rgba(0,0,0,0.1);
             z-index: 1000;
             transition: right 0.3s ease;
@@ -470,7 +470,7 @@
         }
 
         #marker-list-container.visible {
-            right: 0; /* Slide in from the right */
+            right: 0; 
         }
 
         .marker-list-item {
@@ -631,8 +631,8 @@
             }
 
             #marker-list-container {
-                width: 100%;
-                right: -100%;
+                width: 95%; 
+                right: -95%;
             }
 
             #marker-list-container.visible {
@@ -695,6 +695,40 @@
         /* Responsive map controls */
         .leaflet-control-zoom {
             display: none; /* Hide default zoom controls */
+        }
+        
+        /* Updated Marker List Styles for Mobile Responsiveness */
+        @media (max-width: 768px) {
+            #marker-list-container {
+                padding: 10px;
+            }
+
+            .marker-list-item {
+                padding: 12px 8px; 
+                font-size: 0.9em; 
+            }
+
+            .marker-list-search {
+                font-size: 16px; 
+                padding: 8px;
+            }
+
+            .marker-list-filters {
+                flex-wrap: wrap;
+                gap: 5px;
+            }
+
+            .marker-list-filters label {
+                margin-right: 10px;
+                margin-bottom: 5px;
+            }
+        }
+
+        /* Enhanced touch interactions */
+        @media (pointer: coarse) {
+            .marker-list-item {
+                padding: 15px 10px; 
+            }
         }
     </style>
 </head>
