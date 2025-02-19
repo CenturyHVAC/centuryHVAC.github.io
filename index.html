@@ -1,7 +1,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Collaborative Map</title>
+    <title>Synchronized Leaflet Map</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-rotate@0.1.2/dist/leaflet-rotate.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-contextmenu@1.4.0/dist/leaflet.contextmenu.min.css" />
@@ -11,7 +11,6 @@
             padding: 0;
             height: 100%;
             overflow: hidden;
-            font-family: Arial, sans-serif;
         }
         #map {
             height: 100%;
@@ -43,7 +42,7 @@
             margin-bottom: 10px;
             display: inline-block;
         }
-        #marker-label-modal, #map-code-modal {
+        #marker-label-modal {
             position: fixed;
             top: 50%;
             left: 50%;
@@ -54,42 +53,31 @@
             box-shadow: 0 0 10px rgba(0,0,0,0.5);
             z-index: 2000;
             display: none;
-            text-align: center;
         }
-        #marker-label-modal input, #map-code-input {
+        #marker-label-modal input {
             width: 100%;
             margin-bottom: 10px;
-            padding: 5px;
         }
-        #map-code-display {
-            font-weight: bold;
-            margin: 10px 0;
-            padding: 10px;
-            background-color: #f0f0f0;
-            border-radius: 5px;
-        }
-        #map-code-button {
+        #connection-status {
             position: absolute;
             top: 10px;
             right: 10px;
-            z-index: 1000;
-            background-color: white;
-            border: 1px solid #ccc;
+            background: rgba(0,0,0,0.7);
+            color: white;
             padding: 5px 10px;
             border-radius: 5px;
-            cursor: pointer;
+            z-index: 1000;
         }
     </style>
 </head>
 <body>
     <div id="map"></div>
-    
-    <button id="map-code-button">Map Code</button>
-
     <div id="rotation-control">
         <div id="rotation-display">0°</div>
         <input type="range" id="rotation-slider" min="0" max="360" value="0">
     </div>
+
+    <div id="connection-status">Disconnected</div>
 
     <div id="marker-label-modal">
         <h3>Add Marker Label</h3>
@@ -98,20 +86,13 @@
         <button id="cancel-marker-label">Cancel</button>
     </div>
 
-    <div id="map-code-modal">
-        <h3>Your Collaborative Map</h3>
-        <p>Use this code to share your map:</p>
-        <div id="map-code-display"></div>
-        <input type="text" id="map-code-input" placeholder="Enter map code">
-        <button id="join-map-btn">Join Map</button>
-        <button id="close-map-code-modal">Close</button>
-    </div>
+    <!-- Firebase Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
 
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-rotate@0.1.2/dist/leaflet-rotate.js"></script>
     <script src="https://unpkg.com/leaflet-contextmenu@1.4.0/dist/leaflet.contextmenu.min.js"></script>
-    <script src="map.js"></script>
+    <script type="module" src="map.js"></script>
 </body>
 </html>
