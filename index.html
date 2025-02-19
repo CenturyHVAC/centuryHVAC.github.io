@@ -455,8 +455,8 @@
         #marker-list-container {
             position: absolute;
             top: 0;
-            right: -21%; /* Hidden by default, on the right side */
-            width: 20%;
+            right: -350px; /* Hidden by default, on the right side */
+            width: 350px;
             height: 100%;
             background-color: rgba(255, 255, 255, 0.95);
             border-radius: 10px 0 0 10px; /* Rounded on the left side */
@@ -590,6 +590,25 @@
             gap: 5px;
         }
     </style>
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js';
+        import { getDatabase } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js';
+        import { getAuth } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDXWogbfI_heWojtSOP9A-dnMVTm9R9ad4",
+            authDomain: "centuryhvac-7a45d.firebaseapp.com",
+            databaseURL: "https://centuryhvac-7a45d-default-rtdb.firebaseio.com",
+            projectId: "centuryhvac-7a45d",
+            storageBucket: "centuryhvac-7a45d.firebasestorage.app",
+            messagingSenderId: "668748123530",
+            appId: "1:668748123530:web:a42d8778e5f238b7e94c73",
+            measurementId: "G-ZPFFWN1PP4"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+    </script>
 </head>
 <body>
     <button id="add-marker-button">Add Unit</button>
@@ -766,8 +785,6 @@
 
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-rotate@0.1.2/dist/leaflet-rotate.js"></script>
-    <script type="module" src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js"></script>
-    <script type="module" src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js"></script>
     <script type="module" src="map.js"></script>
 </body>
 </html>

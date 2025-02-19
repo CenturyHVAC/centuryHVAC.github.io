@@ -1,9 +1,8 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js';
-import { getDatabase, ref, set, onValue, push, remove } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js';
+import { getDatabase, ref, onValue, set, push, update, remove } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js';
+import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('DOMContentLoaded event fired');
-
   // Firebase Configuration
   const firebaseConfig = {
     apiKey: "AIzaSyDXWogbfI_heWojtSOP9A-dnMVTm9R9ad4",
@@ -19,27 +18,89 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize Firebase
   const app = initializeApp(firebaseConfig);
   const database = getDatabase(app);
-  const markersRef = ref(database, 'mapMarkers');
+  const auth = getAuth(app);
 
-  let map; // Declare map globally to be accessible across functions
+  // Anonymous Authentication
   let currentUser = null;
+  signInAnonymously(auth)
+    .then((userCredential) => {
+      currentUser = userCredential.user;
+      console.log('Signed in anonymously');
+    })
+    .catch((error) => {
+      console.error('Anonymous sign-in error:', error);
+    });
 
-  // Function to generate a unique user ID
-  function generateUserId() {
-    return 'user_' + Math.random().toString(36).substr(2, 9);
-  }
+  // Reference to map data in Firebase
+  const mapDataRef = ref(database, 'mapData');
 
-  // Set or get user ID from localStorage
-  function getUserId() {
-    let userId = localStorage.getItem('userId');
-    if (!userId) {
-      userId = generateUserId();
-      localStorage.setItem('userId', userId);
+  // Modify the existing code to use Firebase for real-time sync
+  let map;
+
+  // Modify saveMapProgress to sync with Firebase
+  function saveMapProgressToFirebase() {
+    if (map && currentUser) {
+      const mapState = {
+        center: map.getCenter(),
+        zoom: map.getZoom(),
+        bearing: map.getBearing(),
+        markers: []
+      };
+
+      // Collect marker data
+      map.eachLayer((layer) => {
+        if (layer instanceof L.Marker) {
+          mapState.markers.push({
+            latlng: layer.getLatLng(),
+            markerData: layer.markerData
+          });
+        }
+      });
+
+      // Update Firebase with map state
+      set(mapDataRef, mapState)
+        .then(() => console.log('Map progress saved to Firebase'))
+        .catch((error) => console.error('Error saving map progress:', error));
     }
-    return userId;
   }
 
-  currentUser = getUserId();
+  // Load map progress from Firebase
+  function loadMapProgressFromFirebase() {
+    onValue(mapDataRef, (snapshot) => {
+      const mapState = snapshot.val();
+      if (mapState) {
+        // Restore map view
+        map.setView(mapState.center, mapState.zoom);
+        map.setBearing(mapState.bearing);
+
+        // Clear existing markers
+        map.eachLayer((layer) => {
+          if (layer instanceof L.Marker) {
+            map.removeLayer(layer);
+          }
+        });
+
+        // Restore markers
+        mapState.markers.forEach(markerData => {
+          const marker = L.marker(markerData.latlng, {
+            draggable: false,
+            icon: greenIcon
+          }).addTo(map)
+          .on('click', function(markerEvent) {
+            markerEvent.originalEvent.stopPropagation();
+            currentMarker = this;
+            showContextMenu(markerEvent);
+          });
+
+          // Set marker data
+          marker.markerData = markerData.markerData;
+          setMarkerIcon(marker);
+        });
+
+        updateMarkerList();
+      }
+    });
+  }
 
   // Define custom icons
   const greenIcon = L.icon({
@@ -84,85 +145,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Function to load saved map progress
-  function loadMapProgress() {
-    const savedProgress = localStorage.getItem('mapProgress');
-    if (savedProgress) {
-      const mapState = JSON.parse(savedProgress);
-
-      // Restore map view
-      map.setView(mapState.center || [latitude, longitude], mapState.zoom || 19);
-      map.setBearing(mapState.bearing || 163);
-
-      // Restore rotation slider
-      const rotationSlider = document.getElementById('rotation-slider');
-      const rotationDisplay = document.getElementById('rotation-display');
-      rotationSlider.value = mapState.bearing || 163;
-      rotationDisplay.textContent = `${mapState.bearing || 163}°`;
-
-      // Restore markers
-      if (mapState.markers) {
-        mapState.markers.forEach(markerData => {
-          // Ensure markerData has the necessary structure
-          const safeMarkerData = {
-            latlng: markerData.latlng || { lat: latitude, lng: longitude },
-            markerData: {
-              unitId: markerData.markerData?.unitId || 'UNKNOWN',
-              status: markerData.markerData?.status || 'up',
-              notes: markerData.markerData?.notes || '',
-              details: markerData.markerData?.details || {},
-              parts: markerData.markerData?.parts || [],
-              history: {
-                status: markerData.markerData?.history?.status || [],
-                parts: markerData.markerData?.history?.parts || []
-              }
-            }
-          };
-
-          const marker = L.marker(safeMarkerData.latlng, {
-            draggable: false,
-            icon: getMarkerIconByStatus(safeMarkerData.markerData.status)
-          }).addTo(map)
-          .on('click', function(markerEvent) {
-            markerEvent.originalEvent.stopPropagation();
-            currentMarker = this;
-            showContextMenu(markerEvent);
-          });
-
-          // Set marker data, with fallback values
-          marker.markerData = safeMarkerData.markerData;
-        });
-      }
-    }
-  }
-
-  // Function to save map progress
-  function saveMapProgress() {
-    if (map) {
-      // Get all markers and their data
-      const markers = [];
-      map.eachLayer((layer) => {
-        if (layer instanceof L.Marker) {
-          markers.push({
-            latlng: layer.getLatLng(),
-            markerData: layer.markerData
-          });
-        }
-      });
-
-      // Create map state object with ONLY markers
-      const mapState = {
-        markers: markers
-      };
-
-      // Save to localStorage
-      localStorage.setItem('mapProgress', JSON.stringify(mapState));
-
-      // Save markers to Firebase
-      set(markersRef, mapState);
-    }
-  }
-
   const latitude = 35.31062486972806;
   const longitude = -81.84777052479605;
 
@@ -184,7 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
   map = L.map('map', {
     center: [latitude, longitude],
     zoom: 19,
-    minZoom: 18,
+    minZoom: 19,
     maxZoom: 20.25,
     rotate: true,
     rotateControl: {
@@ -201,7 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
   map.setBearing(163);
 
   // Load saved progress after map initialization
-  loadMapProgress();
+  loadMapProgressFromFirebase();
 
   // Add the satellite tile layer after loading saved progress
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -222,13 +204,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const rotation = e.target.value;
     map.setBearing(rotation);
     rotationDisplay.textContent = `${rotation}°`;
-    saveMapProgress(); // Save state after rotation change
+    saveMapProgressToFirebase(); // Save state after rotation change
   });
 
   // Add event listeners for map state changes
-  map.on('moveend', saveMapProgress);
-  map.on('zoomend', saveMapProgress);
-  map.on('rotate', saveMapProgress);
+  map.on('moveend', saveMapProgressToFirebase);
+  map.on('zoomend', saveMapProgressToFirebase);
+  map.on('rotate', saveMapProgressToFirebase);
 
   // Keyboard control for rotation slider
   document.addEventListener('keydown', (event) => {
@@ -345,7 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Hide edit section
       statusEditSection.classList.add('hidden');
-      saveMapProgress(); // Save state after updating status
+      saveMapProgressToFirebase(); // Save state after updating status
     }
   });
 
@@ -464,11 +446,9 @@ document.addEventListener('DOMContentLoaded', () => {
       partReplacementDateInput.value = '';
       addPartsInput.classList.add('hidden');
       showAddPartsBtn.classList.remove('hidden');
-      editingPartIndex = -1; // Reset editing index
-      
       populatePartsList(partsList, currentMarker, editingPartIndex, partNameInput, partNumberInput, partReplacementDateInput, addPartsInput, showAddPartsBtn, saveNewPartBtn);
       updatePartsHistory(partsHistoryContainer, currentMarker);
-      saveMapProgress(); // Save state after updating parts
+      saveMapProgressToFirebase(); // Save state after updating parts
     }
   });
 
@@ -537,7 +517,7 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
       // Hide editable grid, show details display
       detailsGrid.style.display = 'none';
       detailsDisplay.style.display = 'block';
-      saveMapProgress(); // Save state after updating details
+      saveMapProgressToFirebase(); // Save state after updating details
     }
   });
 
@@ -576,7 +556,7 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
             currentMarker.markerData.parts.splice(partIndex, 1); // Remove part from array
             populatePartsList(partsList, currentMarker, editingPartIndex, partNameInput, partNumberInput, partReplacementDateInput, addPartsInput, showAddPartsBtn, saveNewPartBtn);
             updatePartsHistory(partsHistoryContainer, currentMarker);
-            saveMapProgress(); // Save state after deleting part
+            saveMapProgressToFirebase(); // Save state after deleting part
           }
         });
 
@@ -640,7 +620,7 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
       
       populatePartsList(partsList, currentMarker, editingPartIndex, partNameInput, partNumberInput, partReplacementDateInput, addPartsInput, showAddPartsBtn, saveNewPartBtn);
       updatePartsHistory(partsHistoryContainer, currentMarker);
-      saveMapProgress();
+      saveMapProgressToFirebase();
     }
   });
 
@@ -756,7 +736,7 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
         if (newUnitId !== null && newUnitId.trim() !== '') {
           currentMarker.markerData.unitId = newUnitId.trim();
           unitIdDisplay.textContent = newUnitId.trim();
-          saveMapProgress();
+          saveMapProgressToFirebase();
         }
       });
 
@@ -766,7 +746,7 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
         if (confirm(`Are you sure you want to delete ${currentMarker.markerData.unitId}? This action cannot be undone.`)) {
           map.removeLayer(currentMarker);
           newContextMenu.remove();
-          saveMapProgress();
+          saveMapProgressToFirebase();
         }
       });
 
@@ -940,7 +920,7 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
 
         updateStatusHistory(statusHistoryContainer, currentMarker);
         statusEditSection.classList.add('hidden');
-        saveMapProgress();
+        saveMapProgressToFirebase();
       }
     });
 
@@ -990,7 +970,7 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
         
         populatePartsList(partsList, currentMarker, editingPartIndex, partNameInput, partNumberInput, partReplacementDateInput, addPartsInput, showAddPartsBtn, saveNewPartBtn);
         updatePartsHistory(partsHistoryContainer, currentMarker);
-        saveMapProgress();
+        saveMapProgressToFirebase();
       }
     });
 
@@ -1039,7 +1019,7 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
         detailsDisplay.textContent = formattedDetails;
         detailsGrid.style.display = 'none';
         detailsDisplay.style.display = 'block';
-        saveMapProgress();
+        saveMapProgressToFirebase();
       }
     });
   }
@@ -1138,8 +1118,8 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
     };
   }
 
-  const originalSaveMapProgress = saveMapProgress;
-  saveMapProgress = setupEnhancedSaveMapProgress(originalSaveMapProgress);
+  const originalSaveMapProgress = saveMapProgressToFirebase;
+  saveMapProgressToFirebase = setupEnhancedSaveMapProgress(originalSaveMapProgress);
 
   const markerListSearch = document.getElementById('marker-list-search');
   const filterCheckboxes = document.querySelectorAll('.marker-list-filters input[type="checkbox"]');
@@ -1306,6 +1286,19 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
         }).addTo(map)
         .on('click', function(markerEvent) {
           markerEvent.originalEvent.stopPropagation();
+          if (!this.markerData) {
+            this.markerData = {
+              unitId: unitId,
+              status: 'up',
+              notes: '',
+              details: {},
+              parts: [],
+              history: {
+                status: [],
+                parts: []
+              }
+            };
+          }
           currentMarker = this;
           showContextMenu(markerEvent);
         });
@@ -1323,7 +1316,7 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
         };
       });
 
-      saveMapProgress();
+      saveMapProgressToFirebase();
       closeMultipleMarkersModal();
     }
 
@@ -1332,40 +1325,53 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
     rightClickPoint = null;
   });
 
-  // Listen for changes in Firebase
-  onValue(markersRef, (snapshot) => {
-    const mapState = snapshot.val();
-    if (mapState && mapState.markers) {
-      // Only clear existing markers
-      map.eachLayer((layer) => {
-        if (layer instanceof L.Marker) {
-          map.removeLayer(layer);
+  function setupFirebaseSync(map) {
+    // Create references to the original save and load functions
+    const originalSaveMapProgress = saveMapProgressToFirebase;
+    const originalLoadMapProgress = loadMapProgressFromFirebase;
+
+    // Modify function to handle both Firebase sync and list updates
+    function enhancedSaveMapProgress() {
+      originalSaveMapProgress();
+      updateMarkerList();
+    }
+
+    // Replace global save and load functions
+    window.saveMapProgress = enhancedSaveMapProgress;
+    window.loadMapProgress = originalLoadMapProgress;
+
+    // Add markers with Firebase sync
+    function addMarkerWithFirebase(unitId, latlng) {
+      const marker = L.marker(latlng, {
+        draggable: false,
+        icon: greenIcon
+      }).addTo(map)
+      .on('click', function(markerEvent) {
+        markerEvent.originalEvent.stopPropagation();
+        currentMarker = this;
+        showContextMenu(markerEvent);
+      });
+
+      marker.markerData = {
+        unitId: unitId,
+        status: 'up',
+        notes: '',
+        details: {},
+        parts: [],
+        history: {
+          status: [],
+          parts: []
         }
-      });
+      };
 
-      // Restore markers from Firebase
-      mapState.markers.forEach(markerData => {
-        const marker = L.marker(markerData.latlng, {
-          draggable: false,
-          icon: getMarkerIconByStatus(markerData.markerData.status)
-        }).addTo(map)
-        .on('click', function(markerEvent) {
-          markerEvent.originalEvent.stopPropagation();
-          currentMarker = this;
-          showContextMenu(markerEvent);
-        });
-
-        marker.markerData = markerData.markerData;
-      });
+      setMarkerIcon(marker);
+      saveMapProgress(); // Sync with Firebase
     }
-  });
 
-  // Helper function to get marker icon by status
-  function getMarkerIconByStatus(status) {
-    switch(status) {
-      case 'down': return redIcon;
-      case 'limited': return yellowIcon;
-      default: return greenIcon;
-    }
+    // Expose the function globally
+    window.addMarkerWithFirebase = addMarkerWithFirebase;
   }
+
+  // After map initialization, set up Firebase sync
+  setupFirebaseSync(map);
 });
