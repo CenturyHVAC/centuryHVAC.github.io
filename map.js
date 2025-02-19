@@ -222,7 +222,7 @@ function initializeMap() {
   map = L.map('map', {
     center: [latitude, longitude],
     zoom: 19,
-    minZoom: 19,
+    minZoom: 18,
     maxZoom: 20.25,
     rotate: true,
     rotateControl: {
