@@ -1,16 +1,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Synchronized Leaflet Map</title>
+    <title>Rotatable Leaflet Map</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-rotate@0.1.2/dist/leaflet-rotate.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-contextmenu@1.4.0/dist/leaflet.contextmenu.min.css" />
     <style>
         body, html {
             margin: 0;
             padding: 0;
             height: 100%;
             overflow: hidden;
+            font-family: Arial, sans-serif;
         }
         #map {
             height: 100%;
@@ -28,6 +28,11 @@
             width: 80%;
             max-width: 400px;
             text-align: center;
+            opacity: 0.1; /* Default transparency */
+            transition: opacity 0.3s ease; /* Smooth transition for opacity */
+        }
+        #rotation-control:hover, #rotation-control:focus-within {
+            opacity: 0.6; /* Opacity on hover */
         }
         #rotation-slider {
             width: 100%;
@@ -42,57 +47,727 @@
             margin-bottom: 10px;
             display: inline-block;
         }
-        #marker-label-modal {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
-            z-index: 2000;
+        #add-marker-button {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 1000;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            background-color: rgba(255, 255, 255, 0.8);
+            cursor: pointer;
+        }
+        #add-marker-button:hover {
+            background-color: rgba(230, 230, 230, 0.9);
+        }
+        #add-marker-button.active {
+            background-color: rgba(200, 200, 255, 0.9);
+        }
+
+        /* New Context Menu Styles - Clean and Professional */
+        .context-menu {
+            position: absolute;
+            width: 400px;
+            max-height: 80%;
+            overflow: auto;
+            background: #fefefe;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-shadow: 0 2px 7px rgba(0,0,0,0.08);
+            z-index: 1000;
+            font-size: 0.95em;
+        }
+        .context-menu.hidden {
             display: none;
         }
-        #marker-label-modal input {
-            width: 100%;
+        .context-menu-tabs {
+            display: flex;
+            border-bottom: 1px solid #eee;
+        }
+        .context-menu-tabs .tab {
+            flex-grow: 1;
+            padding: 8px 10px;
+            text-align: center;
+            background: #f9f9f9;
+            border: none;
+            cursor: pointer;
+            font-weight: normal;
+            color: #555;
+        }
+        .context-menu-tabs .tab:hover {
+            background: #f0f0f0;
+        }
+        .context-menu-tabs .tab.active {
+            background: #fff;
+            font-weight: 500;
+            border-bottom: 2px solid #007bff;
+            color: #333;
+        }
+        .tab-content {
+            padding: 15px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .tab-panel {
+            display: none;
+        }
+        .tab-panel.active {
+            display: block;
+        }
+        .hidden {
+            display: none !important;
+        }
+        .status-display {
+            display: flex;
+            align-items: center;
             margin-bottom: 10px;
         }
-        #connection-status {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.7);
+        .status-text {
+            margin-left: 10px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        .status-text.status-up { background-color: #4caf50; color: white; }
+        .status-text.status-down { background-color: #f44336; color: white; }
+        .status-text.status-limited { background-color: #ff9800; color: white; }
+        .edit-status-btn, .delete-marker-btn, #show-add-parts-btn, #save-new-part-btn, #save-status-btn, .edit-part-btn, .delete-part-btn {
+            background-color: #e9ecef;
+            color: #495057;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background-color 0.2s ease;
+            margin-left: 10px; /* Add margin to separate buttons */
+        }
+        .edit-status-btn:hover, .delete-marker-btn:hover, #show-add-parts-btn:hover, #save-new-part-btn:hover, #save-status-btn:hover, .edit-part-btn:hover, .delete-part-btn:hover {
+            background-color: #d8dce0;
+        }
+        .edit-status-btn svg, .delete-marker-btn svg {
+            vertical-align: middle;
+        }
+
+        .form-input {
+            width: calc(100% - 18px);
+            margin-bottom: 8px;
+            padding: 7px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        .btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-primary, #add-marker-button {
+            background-color: #007bff;
             color: white;
-            padding: 5px 10px;
-            border-radius: 5px;
+        }
+        .btn-primary:hover, #add-marker-button:hover {
+            background-color: #0056b3;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        .context-menu-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #f8f9fa;
+            padding: 10px 15px;
+            border-bottom: 2px solid #007bff; 
+            font-size: 1em;
+            color: #343a40;
+        }
+        .header-unit-id {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;  
+            flex: 1;
+            gap: 6px;
+            padding-left: 150px;  
+        }
+        .header-unit-id span {
+            font-weight: bold; 
+        }
+        .header-unit-id .icon-button {
+            margin-left: 0px; /* Tighten the spacing between buttons */
+        }
+
+        .header-buttons {
+            display: flex;
+            align-items: center;
+        }
+
+        .header-button {
+            padding: 4px 8px;
+            background: #e9ecef;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            cursor: pointer;
+            color: #495057;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .header-button:hover {
+            background: #d8dce0;
+            border-color: #adb5bd;
+        }
+        .edit-unit-id-btn, .delete-marker-btn {
+            padding: 4px 8px;
+            background: #e9ecef;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            cursor: pointer;
+            color: #495057;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .edit-unit-id-btn:hover, .delete-marker-btn:hover {
+            background: #d8dce0;
+            border-color: #adb5bd;
+        }
+        .header-button.delete-marker-btn:hover {
+            background: #dc3545;
+            border-color: #dc3545;
+            color: white;
+        }
+        .scrollable-history {
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 8px;
+            border: 1px solid #eee;
+            font-size: 0.85em;
+            scrollbar-width: thin;
+            scrollbar-color: #888 #f1f1f1;
+            word-break: break-word;
+        }
+        .scrollable-history::-webkit-scrollbar {
+            width: 8px;
+        }
+        .scrollable-history::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        .scrollable-history::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        .scrollable-history::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        .history-entry {
+            margin-bottom: 8px;
+            padding: 6px;
+            background-color: #fefefe;
+            border-radius: 3px;
+            border: 1px solid #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .history-date {
+            color: #777;
+            font-size: 0.8em;
+            margin-bottom: 4px;
+            align-self: flex-start;
+        }
+        .history-status {
+            font-weight: bold;
+            margin-bottom: 4px;
+            align-self: flex-start;
+        }
+        .history-notes {
+            color: #555;
+            font-style: italic;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 100%;
+        }
+        .parts-list-container {
+            max-height: 180px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            margin-top: 5px;
+        }
+        .parts-list {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+        .part-entry {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 10px;
+            border-bottom: 1px solid #eee;
+            font-size: 0.9em;
+        }
+        .part-entry:last-child {
+            border-bottom: none;
+        }
+        .part-actions {
+            display: flex;
+            gap: 5px;
+        }
+        .parts-list-actions {
+            margin-bottom: 10px;
+        }
+        .parts-input-container {
+            padding-bottom: 10px;
+        }
+        #latest-notes-display {
+            color: #666;
+            font-style: italic;
+            margin-top: 5px;
+            padding: 5px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            display: none;
+        }
+        #latest-notes-display.has-notes {
+            display: block;
+        }
+        /* Additional styles for Details tab */
+        .details-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 10px;
+            align-items: center;
+        }
+        .details-grid label {
+            font-weight: bold;
+            color: #555;
+        }
+        .details-grid input, .details-grid select {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .details-grid input:disabled, .details-grid select:disabled {
+            background-color: #f1f1f1;
+            color: #666;
+            cursor: not-allowed;
+        }
+        .details-display {
+            background-color: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            user-select: text;
+            cursor: text;
+        }
+        #edit-details-btn {
+            margin-top: 10px;
+            margin-right: 10px;
+        }
+        
+        /* Map Context Menu Styles */
+        .map-context-menu {
+            position: absolute;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            padding: 5px 0;
             z-index: 1000;
+        }
+        
+        .map-context-menu.hidden {
+            display: none;
+        }
+        
+        .map-context-menu-item {
+            padding: 8px 15px;
+            cursor: pointer;
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .map-context-menu-item:hover {
+            background-color: #f0f0f0;
+        }
+        /* Add these styles for consistent icon buttons */
+        .icon-button {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+            border-radius: 4px;
+            transition: background-color 0.2s ease;
+        }
+        .icon-button:hover {
+            background-color: rgba(0,0,0,0.1);
+        }
+        .icon-button svg {
+            width: 16px;
+            height: 16px;
+            stroke: #495057;
+            stroke-width: 2;
+        }
+        .icon-button.delete-btn:hover svg {
+            stroke: #dc3545;
+        }
+
+        /* Marker List Styles */
+        #marker-list-toggle {
+            position: absolute;
+            top: 155px; /* Position under the zoom controls */
+            left: 10px; /* Left side of the page */
+            z-index: 1000;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            background-color: rgba(255, 255, 255, 0.8);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            transition: background-color 0.3s ease;
+        }
+
+        #marker-list-toggle:hover {
+            background-color: rgba(230, 230, 230, 0.9);
+        }
+
+        #marker-list-toggle.active {
+            background-color: rgba(200, 200, 255, 0.9);
+        }
+
+        #marker-list-container {
+            position: absolute;
+            top: 0;
+            right: -21%; /* Hidden by default, on the right side */
+            width: 20%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 10px 0 0 10px; /* Rounded on the left side */
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+            transition: right 0.3s ease;
+            overflow-y: auto;
+            padding: 15px;
+            border-left: 1px solid #e0e0e0;
+        }
+
+        #marker-list-container.visible {
+            right: 0; /* Slide in from the right */
+        }
+
+        .marker-list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: move;
+            user-select: none;
+            transition: background-color 0.2s ease;
+        }
+
+        .marker-list-item:hover {
+            background-color: #f0f0f0;
+        }
+
+        .marker-list-item.dragging {
+            opacity: 0.5;
+        }
+
+        .marker-list-item.drag-over {
+            border: 2px dashed #007bff;
+        }
+
+        .marker-list-item-unit-id {
+            font-weight: bold;
+        }
+
+        .marker-list-item-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+        }
+
+        .marker-list-item-status.status-up { background-color: #4caf50; color: white; }
+        .marker-list-item-status.status-down { background-color: #f44336; color: white; }
+        .marker-list-item-status.status-limited { background-color: #ff9800; color: white; }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 500px;
+            border-radius: 10px;
+        }
+
+        .marker-input-row {
+            display: flex;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .marker-input-row input {
+            flex-grow: 1;
+            margin-right: 10px;
+        }
+
+        .close-modal {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close-modal:hover {
+            color: black;
+        }
+
+        #multiple-markers-container {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 15px;
+        }
+
+        .modal-actions button {
+            margin-left: 10px;
+        }
+        
+        /* Styles for search and filter */
+        .marker-list-search {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .marker-list-filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            justify-content: space-between;
+        }
+        
+        .marker-list-filters label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
     </style>
 </head>
 <body>
+    <button id="add-marker-button">Add Unit</button>
+    <button id="marker-list-toggle" title="Unit List">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="8" y1="6" x2="21" y2="6"></line>
+            <line x1="8" y1="12" x2="21" y2="12"></line>
+            <line x1="8" y1="18" x2="21" y2="18"></line>
+            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+        </svg>
+    </button>
     <div id="map"></div>
     <div id="rotation-control">
-        <div id="rotation-display">0°</div>
-        <input type="range" id="rotation-slider" min="0" max="360" value="0">
+        <div id="rotation-display">163</div>
+        <input type="range" id="rotation-slider" min="0" max="360" value="163">
     </div>
 
-    <div id="connection-status">Disconnected</div>
-
-    <div id="marker-label-modal">
-        <h3>Add Marker Label</h3>
-        <input type="text" id="marker-label-input" placeholder="Enter marker label">
-        <button id="save-marker-label">Save</button>
-        <button id="cancel-marker-label">Cancel</button>
+    <div id="marker-list-container">
+        <h3>Unit List</h3>
+        <input type="text" id="marker-list-search" class="marker-list-search" placeholder="Search Units...">
+        <div class="marker-list-filters">
+            <label>
+                <input type="checkbox" id="filter-up" checked>
+                UP
+            </label>
+            <label>
+                <input type="checkbox" id="filter-limited" checked>
+                Limited
+            </label>
+            <label>
+                <input type="checkbox" id="filter-down" checked>
+                Down
+            </label>
+        </div>
+        <div id="marker-list"></div>
     </div>
 
-    <!-- Firebase Scripts -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+    <div id="context-menu" class="context-menu hidden">
+        <div class="context-menu-header" id="context-menu-header">
+            <div class="header-unit-id">
+                <span id="unit-id-display">UNIT-ID</span>
+                <button class="icon-button edit-unit-id-btn" title="Edit Unit ID">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                </button>
+                <button class="icon-button delete-btn delete-marker-btn" title="Delete Unit">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                    </svg>
+                </button>
+            </div>
+            <button class="icon-button close-btn" title="Close">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+        <div class="context-menu-tabs">
+            <button class="tab active" data-tab="status">Status</button>
+            <button class="tab" data-tab="parts">Parts</button>
+            <button class="tab" data-tab="details">Details</button>
+            <button class="tab" data-tab="history">History</button>
+        </div>
+        <div class="tab-content">
+            <div id="status-tab" class="tab-panel active">
+                <div class="status-display">
+                    <span>Current Status: </span>
+                    <strong id="current-status-display" class="status-text"></strong>
+                    <button id="edit-status-btn" class="icon-button edit-btn" title="Edit Status">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div id="latest-notes-display" class="latest-notes"></div>
+                <div id="status-edit-section" class="hidden">
+                    <select id="unit-status" class="form-input">
+                        <option value="up" class="status-up">UP</option>
+                        <option value="down" class="status-down">DOWN</option>
+                        <option value="limited" class="status-limited">LIMITED</option>
+                    </select>
+                    <textarea id="status-notes" placeholder="Additional status notes" class="form-input"></textarea>
+                    <button id="save-status-btn" class="btn btn-primary">Save Status</button>
+                </div>
+            </div>
+            <div id="parts-tab" class="tab-panel">
+                <div class="parts-input-container hidden" id="add-parts-input">
+                    <div class="parts-input-row">
+                        <input type="text" id="part-name" placeholder="Part Name" class="form-input">
+                        <input type="text" id="part-number" placeholder="Part Number" class="form-input">
+                    </div>
+                    <div class="parts-input-row">
+                        <label for="part-replacement-date" class="date-label">Replacement Date:</label>
+                        <input type="date" id="part-replacement-date" class="form-input date-input">
+                        <button id="save-new-part-btn" class="btn btn-primary">Save Part</button>
+                    </div>
+                </div>
+                <div class="parts-list-actions">
+                    <button id="show-add-parts-btn" class="btn btn-primary">Add Part</button>
+                </div>
+                <div class="parts-list-container">
+                    <ul id="parts-list" class="parts-list"></ul>
+                </div>
+            </div>
+            <div id="details-tab" class="tab-panel">
+                <div class="details-actions">
+                    <button id="edit-details-btn" class="btn btn-secondary">Edit Details</button>
+                    <button id="save-details-btn" class="btn btn-primary" style="display: none;">Save Details</button>
+                </div>
+                <div class="details-display" id="details-display"></div>
+                <div class="details-grid" style="display: none;">
+                    <label for="unit-brand">Brand:</label>
+                    <input type="text" id="unit-brand" class="form-input" disabled>
+
+                    <label for="unit-model">Model:</label>
+                    <input type="text" id="unit-model" class="form-input" disabled>
+
+                    <label for="unit-serial">Serial:</label>
+                    <input type="text" id="unit-serial" class="form-input" disabled>
+
+                    <label for="unit-mfg-date">Mfg Date:</label>
+                    <input type="date" id="unit-mfg-date" class="form-input" disabled>
+
+                    <label for="unit-freon-type">Freon Type:</label>
+                    <select id="unit-freon-type" class="form-input" disabled>
+                        <option value="">Select Freon Type</option>
+                        <option value="R-22">R-22</option>
+                        <option value="R-410A">R-410A</option>
+                        <option value="R-134A">R-134A</option>
+                        <option value="R-407C">R-407C</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+            </div>
+            <div id="history-tab" class="tab-panel">
+                <div id="status-history" class="scrollable-history"></div>
+                <div id="parts-history" class="scrollable-history"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="map-context-menu" class="map-context-menu hidden">
+        <div class="map-context-menu-item" id="add-unit-marker-btn">
+            Add Unit Marker
+        </div>
+    </div>
+
+    <div id="multiple-markers-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Add Multiple Units</h2>
+            <div id="multiple-markers-container">
+                <div class="marker-input-row">
+                    <input type="text" class="unit-id-input" placeholder="UNIT-ID">
+                    <button class="remove-marker-row">-</button>
+                </div>
+            </div>
+            <button id="add-marker-row-btn">+ Add Another Unit</button>
+            <div class="modal-actions">
+                <button id="save-multiple-markers-btn">Save Units</button>
+                <button id="cancel-multiple-markers-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
 
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-rotate@0.1.2/dist/leaflet-rotate.js"></script>
-    <script src="https://unpkg.com/leaflet-contextmenu@1.4.0/dist/leaflet.contextmenu.min.js"></script>
+    <script type="module" src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js"></script>
+    <script type="module" src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js"></script>
     <script type="module" src="map.js"></script>
 </body>
 </html>
