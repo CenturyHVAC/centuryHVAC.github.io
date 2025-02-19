@@ -142,6 +142,23 @@ function initializeMap() {
 
         // Add markers from Firebase
         data.forEach(markerData => {
+          // Ensure marker data has all required properties
+          if (!markerData.markerData.history) {
+            markerData.markerData.history = {
+              status: [],
+              parts: []
+            };
+          }
+          if (!markerData.markerData.history.parts) {
+            markerData.markerData.history.parts = [];
+          }
+          if (!markerData.markerData.history.status) {
+            markerData.markerData.history.status = [];
+          }
+          if (!markerData.markerData.parts) {
+            markerData.markerData.parts = [];
+          }
+
           const marker = L.marker(markerData.latlng, {
             draggable: false
           }).addTo(map)
@@ -152,11 +169,11 @@ function initializeMap() {
                 unitId: markerData.markerData.unitId,
                 status: markerData.markerData.status,
                 notes: markerData.markerData.notes,
-                details: markerData.markerData.details,
-                parts: markerData.markerData.parts,
+                details: markerData.markerData.details || {},
+                parts: markerData.markerData.parts || [],
                 history: {
-                  status: markerData.markerData.history.status,
-                  parts: markerData.markerData.history.parts
+                  status: markerData.markerData.history.status || [],
+                  parts: markerData.markerData.history.parts || []
                 }
               };
             }
@@ -254,7 +271,7 @@ function initializeMap() {
   map = L.map('map', {
     center: [latitude, longitude],
     zoom: 19,
-    minZoom: 19,
+    minZoom: 18,
     maxZoom: 20.25,
     rotate: true,
     rotateControl: {
@@ -704,7 +721,6 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
       partReplacementDateInput.value = '';
       addPartsInput.classList.add('hidden');
       showAddPartsBtn.classList.remove('hidden');
-      editingPartIndex = -1; // Reset editing index
       
       populatePartsList(partsList, currentMarker, editingPartIndex, partNameInput, partNumberInput, partReplacementDateInput, addPartsInput, showAddPartsBtn, saveNewPartBtn);
       updatePartsHistory(partsHistoryContainer, currentMarker);
@@ -860,36 +876,118 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
   function makeDraggable(element) {
     let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
     const header = element.querySelector('.context-menu-header');
+    const buttons = header.querySelectorAll('button');
     
+    // Mouse events
     header.onmousedown = dragMouseDown;
+    // Touch events
+    header.ontouchstart = dragTouchStart;
+
+    // Add a flag to track if we're dragging
+    let isDragging = false;
+    let touchStartTime = 0;
+    const TOUCH_DURATION_THRESHOLD = 200; // ms
+    const TOUCH_MOVEMENT_THRESHOLD = 5; // pixels
 
     function dragMouseDown(e) {
-      e.preventDefault();
-      // Get the mouse cursor position at startup
-      pos3 = e.clientX;
-      pos4 = e.clientY;
-      document.onmouseup = closeDragElement;
-      // Call a function whenever the cursor moves
-      document.onmousemove = elementDrag;
+        // Don't initiate drag if clicking on a button
+        if (e.target.closest('button')) return;
+        
+        e.preventDefault();
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        document.onmouseup = closeDragElement;
+        document.onmousemove = elementDrag;
+    }
+
+    function dragTouchStart(e) {
+        // Don't initiate drag if touching a button
+        if (e.target.closest('button')) return;
+        
+        touchStartTime = Date.now();
+        const touch = e.touches[0];
+        pos3 = touch.clientX;
+        pos4 = touch.clientY;
+        isDragging = false;
+        
+        document.ontouchend = closeDragElement;
+        document.ontouchmove = elementTouchDrag;
     }
 
     function elementDrag(e) {
-      e.preventDefault();
-      // Calculate the new cursor position
-      pos1 = pos3 - e.clientX;
-      pos2 = pos4 - e.clientY;
-      pos3 = e.clientX;
-      pos4 = e.clientY;
-      // Set the element's new position
-      element.style.top = (element.offsetTop - pos2) + "px";
-      element.style.left = (element.offsetLeft - pos1) + "px";
+        e.preventDefault();
+        isDragging = true;
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        updateElementPosition();
     }
 
-    function closeDragElement() {
-      // Stop moving when mouse button is released
-      document.onmouseup = null;
-      document.onmousemove = null;
+    function elementTouchDrag(e) {
+        const touch = e.touches[0];
+        const touchMovement = Math.abs(touch.clientX - pos3) + Math.abs(touch.clientY - pos4);
+        
+        if (touchMovement > TOUCH_MOVEMENT_THRESHOLD) {
+            isDragging = true;
+            e.preventDefault();
+            pos1 = pos3 - touch.clientX;
+            pos2 = pos4 - touch.clientY;
+            pos3 = touch.clientX;
+            pos4 = touch.clientY;
+            updateElementPosition();
+        }
     }
+
+    function updateElementPosition() {
+        // Get viewport dimensions
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        
+        // Calculate new position
+        let newTop = element.offsetTop - pos2;
+        let newLeft = element.offsetLeft - pos1;
+        
+        // Get element dimensions
+        const elementWidth = element.offsetWidth;
+        const elementHeight = element.offsetHeight;
+        
+        // Keep element within viewport bounds
+        newTop = Math.max(0, Math.min(newTop, viewportHeight - elementHeight));
+        newLeft = Math.max(0, Math.min(newLeft, viewportWidth - elementWidth));
+        
+        // Update position
+        element.style.top = newTop + "px";
+        element.style.left = newLeft + "px";
+    }
+
+    function closeDragElement(e) {
+        const touchDuration = Date.now() - touchStartTime;
+        
+        // If it was a short touch and we didn't drag much, treat it as a click
+        if (!isDragging && touchDuration < TOUCH_DURATION_THRESHOLD) {
+            // Allow the click/touch to proceed normally
+            return;
+        }
+        
+        // Reset all event listeners
+        document.onmouseup = null;
+        document.onmousemove = null;
+        document.ontouchend = null;
+        document.ontouchmove = null;
+        isDragging = false;
+    }
+
+    // Add click/touch handlers to buttons that prevent drag
+    buttons.forEach(button => {
+        button.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+        });
+        
+        button.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+        });
+    });
   }
 
   function initializeContextMenuFunctionality(newContextMenu, currentMarker) {
@@ -1226,60 +1324,155 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
   // Call the setup function when the map is ready
   setupMarkerListFilters();
 
-  // Add drag and drop functionality to the marker list
+  function enhanceMarkerList() {
+    setupMarkerListDragAndDrop();
+  }
+
   function setupMarkerListDragAndDrop() {
     const markerList = document.getElementById('marker-list');
     let draggedItem = null;
+    let startY = 0;
+    let startIndex = 0;
 
+    // Track touch movement
+    let touchStartTime = 0;
+    const TOUCH_DURATION_THRESHOLD = 200; // ms
+    const TOUCH_MOVEMENT_THRESHOLD = 5; // pixels
+    let isTouchMoving = false;
+
+    // Helper function to get the index of an element
+    function getElementIndex(el) {
+      const children = [...markerList.children];
+      return children.indexOf(el);
+    }
+
+    // Helper function to get element at specific y-coordinate
+    function getElementAtPosition(y) {
+      const elements = [...markerList.querySelectorAll('.marker-list-item')];
+      return elements.find(el => {
+        const box = el.getBoundingClientRect();
+        return y >= box.top && y <= box.bottom;
+      });
+    }
+
+    markerList.addEventListener('touchstart', (e) => {
+      if (!e.target.closest('.marker-list-item')) return;
+      
+      const item = e.target.closest('.marker-list-item');
+      touchStartTime = Date.now();
+      startY = e.touches[0].clientY;
+      startIndex = getElementIndex(item);
+      isTouchMoving = false;
+
+      // Clone the item for visual feedback
+      draggedItem = item.cloneNode(true);
+      draggedItem.classList.add('dragging');
+      draggedItem.style.position = 'absolute';
+      draggedItem.style.width = `${item.offsetWidth}px`;
+      draggedItem.style.height = `${item.offsetHeight}px`;
+      draggedItem.style.opacity = '0.8';
+      draggedItem.style.zIndex = '1000';
+      
+      // Hide original item
+      item.style.opacity = '0';
+      
+      document.body.appendChild(draggedItem);
+      positionDraggedItem(e.touches[0].clientY);
+    }, { passive: false });
+
+    markerList.addEventListener('touchmove', (e) => {
+      if (!draggedItem) return;
+      
+      e.preventDefault();
+      isTouchMoving = true;
+      
+      const touch = e.touches[0];
+      positionDraggedItem(touch.clientY);
+      
+      const elementAtPosition = getElementAtPosition(touch.clientY);
+      if (elementAtPosition && elementAtPosition !== draggedItem) {
+        const currentIndex = getElementIndex(elementAtPosition);
+        if (currentIndex !== startIndex) {
+          // Reorder elements in the list
+          const items = [...markerList.children];
+          const removed = items.splice(startIndex, 1)[0];
+          items.splice(currentIndex, 0, removed);
+          
+          // Update DOM
+          items.forEach(item => markerList.appendChild(item));
+          startIndex = currentIndex;
+        }
+      }
+    }, { passive: false });
+
+    markerList.addEventListener('touchend', (e) => {
+      if (!draggedItem) return;
+      
+      const touchDuration = Date.now() - touchStartTime;
+      
+      // If it was a short touch and we didn't move much, treat it as a click
+      if (!isTouchMoving && touchDuration < TOUCH_DURATION_THRESHOLD) {
+        // Handle click event (show marker on map, etc.)
+        const originalItem = markerList.children[startIndex];
+        if (originalItem) {
+          originalItem.click();
+        }
+      }
+      
+      // Clean up
+      if (draggedItem.parentNode) {
+        draggedItem.parentNode.removeChild(draggedItem);
+      }
+      
+      // Show original item
+      const items = [...markerList.children];
+      items[startIndex].style.opacity = '1';
+      
+      draggedItem = null;
+      isTouchMoving = false;
+    });
+
+    function positionDraggedItem(y) {
+      if (draggedItem) {
+        draggedItem.style.top = `${y - draggedItem.offsetHeight / 2}px`;
+        draggedItem.style.left = `${markerList.offsetLeft}px`;
+      }
+    }
+
+    // Keep mouse events for desktop
     markerList.addEventListener('dragstart', (e) => {
-      if (e.target.classList.contains('marker-list-item')) {
-        draggedItem = e.target;
-        e.target.classList.add('dragging');
+      if (e.target.closest('.marker-list-item')) {
+        draggedItem = e.target.closest('.marker-list-item');
+        draggedItem.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', ''); // Required for Firefox
+        e.dataTransfer.setData('text/plain', '');
       }
     });
 
     markerList.addEventListener('dragend', (e) => {
-      if (e.target.classList.contains('marker-list-item')) {
-        e.target.classList.remove('dragging');
-        document.querySelectorAll('.marker-list-item').forEach(item => {
-          item.classList.remove('drag-over');
-        });
+      if (draggedItem) {
+        draggedItem.classList.remove('dragging');
+        draggedItem = null;
       }
     });
 
     markerList.addEventListener('dragover', (e) => {
       e.preventDefault();
+      if (!draggedItem) return;
+
       const afterElement = getDragAfterElement(markerList, e.clientY);
-      const draggingItem = document.querySelector('.dragging');
-      
-      if (afterElement == null) {
-        markerList.appendChild(draggingItem);
+      if (afterElement) {
+        markerList.insertBefore(draggedItem, afterElement);
       } else {
-        markerList.insertBefore(draggingItem, afterElement);
-      }
-    });
-
-    markerList.addEventListener('dragenter', (e) => {
-      if (e.target.classList.contains('marker-list-item') && e.target !== draggedItem) {
-        e.target.classList.add('drag-over');
-      }
-    });
-
-    markerList.addEventListener('dragleave', (e) => {
-      if (e.target.classList.contains('marker-list-item')) {
-        e.target.classList.remove('drag-over');
+        markerList.appendChild(draggedItem);
       }
     });
 
     function getDragAfterElement(container, y) {
       const draggableElements = [...container.querySelectorAll('.marker-list-item:not(.dragging)')];
-
       return draggableElements.reduce((closest, child) => {
         const box = child.getBoundingClientRect();
         const offset = y - box.top - box.height / 2;
-        
         if (offset < 0 && offset > closest.offset) {
           return { offset: offset, element: child };
         } else {
@@ -1290,11 +1483,6 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
   }
 
   // Call the setup function after the filters are set up
-  function enhanceMarkerList() {
-    setupMarkerListDragAndDrop();
-  }
-
-  // Enhance the marker list after setting up the filters
   setupMarkerListFilters();
   enhanceMarkerList();
   
