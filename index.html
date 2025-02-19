@@ -1,6 +1,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rotatable Leaflet Map</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-rotate@0.1.2/dist/leaflet-rotate.css" />
@@ -655,6 +656,162 @@
             height: 100%;
             width: 100%;
             position: relative;
+        }
+
+        /* Mobile-friendly adjustments */
+        @media (max-width: 768px) {
+            .context-menu {
+                position: fixed;
+                width: 100%;
+                height: 90vh;
+                left: 0;
+                bottom: 0;
+                top: auto;
+                border-radius: 15px 15px 0 0;
+                box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+                z-index: 2000;
+            }
+
+            .context-menu-header {
+                padding: 15px;
+            }
+
+            .header-unit-id {
+                padding-left: 20px;
+            }
+
+            .tab-content {
+                max-height: calc(90vh - 120px);
+                overflow-y: auto;
+            }
+
+            #marker-list-container {
+                position: fixed;
+                top: auto;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                width: 100%;
+                height: 80vh;
+                border-radius: 15px 15px 0 0;
+                transform: translateY(100%);
+                transition: transform 0.3s ease;
+            }
+
+            #marker-list-container.visible {
+                transform: translateY(0);
+                right: 0;
+            }
+
+            .modal-content {
+                width: 90%;
+                max-width: 500px;
+                margin: 10% auto;
+            }
+
+            #rotation-control {
+                bottom: 60px;
+                width: 90%;
+            }
+
+            .pin-modal-content {
+                width: 90%;
+                max-width: 300px;
+                padding: 20px;
+            }
+
+            .pin-input {
+                width: 80%;
+                max-width: 200px;
+            }
+
+            /* Adjust button sizes for better touch targets */
+            button, .btn {
+                min-height: 44px;
+                padding: 12px 20px;
+            }
+
+            .icon-button {
+                min-height: 44px;
+                min-width: 44px;
+            }
+
+            /* Make form inputs more touch-friendly */
+            input[type="text"],
+            input[type="password"],
+            select,
+            textarea {
+                font-size: 16px; /* Prevent zoom on iOS */
+                padding: 12px;
+                min-height: 44px;
+            }
+
+            /* Adjust marker list items for touch */
+            .marker-list-item {
+                padding: 15px;
+                min-height: 44px;
+            }
+
+            /* Make checkboxes more touch-friendly */
+            input[type="checkbox"] {
+                width: 20px;
+                height: 20px;
+            }
+
+            /* Adjust filters layout */
+            .marker-list-filters {
+                flex-wrap: wrap;
+                gap: 15px;
+            }
+
+            .marker-list-filters label {
+                font-size: 16px;
+            }
+
+            /* Handle landscape mode */
+            @media (orientation: landscape) {
+                .context-menu {
+                    height: 100vh;
+                }
+
+                .tab-content {
+                    max-height: calc(100vh - 120px);
+                }
+
+                #marker-list-container {
+                    height: 100vh;
+                }
+            }
+
+            /* Adjust control positions */
+            #add-marker-button {
+                bottom: 100px;
+            }
+
+            #marker-list-toggle {
+                top: auto;
+                bottom: 20px;
+                left: 20px;
+            }
+
+            /* Prevent text selection during touch */
+            * {
+                -webkit-tap-highlight-color: transparent;
+                -webkit-touch-callout: none;
+                user-select: none;
+            }
+
+            /* Allow text selection in specific areas */
+            input, textarea, .details-display {
+                user-select: text;
+            }
+
+            /* Improve scrolling */
+            .scrollable-history,
+            .parts-list-container,
+            #multiple-markers-container {
+                -webkit-overflow-scrolling: touch;
+            }
         }
     </style>
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>

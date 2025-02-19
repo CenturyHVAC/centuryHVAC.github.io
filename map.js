@@ -17,6 +17,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
+// Single map instance reference
+let map = null;
+
 document.addEventListener('DOMContentLoaded', () => {
   // Check if user is authenticated
   if (!sessionStorage.getItem('pinAuthenticated')) {
@@ -25,8 +28,21 @@ document.addEventListener('DOMContentLoaded', () => {
     return; // Don't initialize map until authenticated
   }
 
-  console.log('DOMContentLoaded event fired');
-  initializeMap();
+  // Show map container
+  document.getElementById('map-container').style.display = 'block';
+  
+  // Initialize map if not already initialized
+  if (!map) {
+    // Clean up any existing map instance
+    const mapElement = document.getElementById('map');
+    if (mapElement._leaflet_id) {
+      mapElement._leaflet_id = null;
+    }
+    
+    setTimeout(() => {
+      initializeMap();
+    }, 100); // Small delay to ensure DOM is fully ready
+  }
 });
 
 // Pin authentication
@@ -38,7 +54,13 @@ document.getElementById('pin-form').addEventListener('submit', (e) => {
     document.getElementById('pin-modal').style.display = 'none';
     document.getElementById('map-container').style.display = 'block';
     document.getElementById('pin-error').style.display = 'none';
-    initializeMap(); // Initialize map after authentication
+    
+    // Initialize map after authentication if not already initialized
+    if (!map) {
+      setTimeout(() => {
+        initializeMap();
+      }, 100); // Small delay to ensure DOM is fully ready
+    }
   } else {
     document.getElementById('pin-error').style.display = 'block';
     document.getElementById('pin-input').value = ''; // Clear input
@@ -46,8 +68,18 @@ document.getElementById('pin-form').addEventListener('submit', (e) => {
 });
 
 function initializeMap() {
-  console.log('Initializing map');
-  let map; // Declare map globally to be accessible across functions
+  // If map already exists, return early
+  if (map) {
+    console.log('Map already initialized');
+    return;
+  }
+
+  // Remove previous map if it exists
+  const existingMap = document.getElementById('map');
+  if (existingMap._leaflet_map) {
+    existingMap._leaflet_map.remove();
+  }
+
   let markersById = new Map(); // Track markers by their IDs
 
   // Define custom icons
@@ -218,11 +250,11 @@ function initializeMap() {
     [latitude + latOffset, longitude + lngOffset]  // Northeast corner
   );
 
-  // Create map with rotation plugin and increased max zoom
+  // Initialize the map
   map = L.map('map', {
     center: [latitude, longitude],
     zoom: 19,
-    minZoom: 18,
+    minZoom: 19,
     maxZoom: 20.25,
     rotate: true,
     rotateControl: {
@@ -231,8 +263,8 @@ function initializeMap() {
     zoomSnap: 0.25,
     zoomDelta: 0.25,
     maxBounds: bounds,
-    maxBoundsViscosity: 1.0,  // Make the bounds absolutely solid
-    inertia: false  // Disable map inertia to prevent overshooting bounds
+    maxBoundsViscosity: 1.0,
+    inertia: false
   });
 
   // Set initial bearing to 163 degrees
