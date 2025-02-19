@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize Firebase
   const app = initializeApp(firebaseConfig);
   const database = getDatabase(app);
-  const mapRef = ref(database, 'mapMarkers');
+  const markersRef = ref(database, 'mapMarkers');
 
   let map; // Declare map globally to be accessible across functions
   let currentUser = null;
@@ -91,66 +91,54 @@ document.addEventListener('DOMContentLoaded', () => {
       const mapState = JSON.parse(savedProgress);
 
       // Restore map view
-      map.setView(mapState.center, mapState.zoom);
-      map.setBearing(mapState.bearing);
+      map.setView(mapState.center || [latitude, longitude], mapState.zoom || 19);
+      map.setBearing(mapState.bearing || 163);
 
       // Restore rotation slider
       const rotationSlider = document.getElementById('rotation-slider');
       const rotationDisplay = document.getElementById('rotation-display');
-      rotationSlider.value = mapState.bearing;
-      rotationDisplay.textContent = `${mapState.bearing}°`;
+      rotationSlider.value = mapState.bearing || 163;
+      rotationDisplay.textContent = `${mapState.bearing || 163}°`;
 
       // Restore markers
-      mapState.markers.forEach(markerData => {
-        const marker = L.marker(markerData.latlng, {
-          draggable: false
-        }).addTo(map)
-        .on('click', function(markerEvent) {
-          markerEvent.originalEvent.stopPropagation();
-          if (!this.markerData) {
-            // Initialize marker data if it doesn't exist
-            this.markerData = {
-              unitId: markerData.markerData.unitId,
-              status: markerData.markerData.status,
-              notes: markerData.markerData.notes,
-              details: markerData.markerData.details,
-              parts: markerData.markerData.parts,
+      if (mapState.markers) {
+        mapState.markers.forEach(markerData => {
+          // Ensure markerData has the necessary structure
+          const safeMarkerData = {
+            latlng: markerData.latlng || { lat: latitude, lng: longitude },
+            markerData: {
+              unitId: markerData.markerData?.unitId || 'UNKNOWN',
+              status: markerData.markerData?.status || 'up',
+              notes: markerData.markerData?.notes || '',
+              details: markerData.markerData?.details || {},
+              parts: markerData.markerData?.parts || [],
               history: {
-                status: markerData.markerData.history.status,
-                parts: markerData.markerData.history.parts
+                status: markerData.markerData?.history?.status || [],
+                parts: markerData.markerData?.history?.parts || []
               }
-            };
-          }
-          currentMarker = this;
-          showContextMenu(markerEvent);
+            }
+          };
+
+          const marker = L.marker(safeMarkerData.latlng, {
+            draggable: false,
+            icon: getMarkerIconByStatus(safeMarkerData.markerData.status)
+          }).addTo(map)
+          .on('click', function(markerEvent) {
+            markerEvent.originalEvent.stopPropagation();
+            currentMarker = this;
+            showContextMenu(markerEvent);
+          });
+
+          // Set marker data, with fallback values
+          marker.markerData = safeMarkerData.markerData;
         });
-
-        // Initialize marker data when creating the marker
-        marker.markerData = {
-          unitId: markerData.markerData.unitId,
-          status: markerData.markerData.status,
-          notes: markerData.markerData.notes,
-          details: markerData.markerData.details,
-          parts: markerData.markerData.parts,
-          history: {
-            status: markerData.markerData.history.status,
-            parts: markerData.markerData.history.parts
-          }
-        };
-
-        // Set marker icon based on loaded status
-        setMarkerIcon(marker);
-      });
+      }
     }
   }
 
   // Function to save map progress
   function saveMapProgress() {
     if (map) {
-      const center = map.getCenter();
-      const zoom = map.getZoom();
-      const bearing = map.getBearing();
-      
       // Get all markers and their data
       const markers = [];
       map.eachLayer((layer) => {
@@ -162,19 +150,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
 
-      // Create map state object
+      // Create map state object with ONLY markers
       const mapState = {
-        center: center,
-        zoom: zoom,
-        bearing: bearing,
         markers: markers
       };
 
       // Save to localStorage
       localStorage.setItem('mapProgress', JSON.stringify(mapState));
 
-      // Save to Firebase
-      set(mapRef, mapState);
+      // Save markers to Firebase
+      set(markersRef, mapState);
     }
   }
 
@@ -1321,19 +1306,6 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
         }).addTo(map)
         .on('click', function(markerEvent) {
           markerEvent.originalEvent.stopPropagation();
-          if (!this.markerData) {
-            this.markerData = {
-              unitId: unitId,
-              status: 'up',
-              notes: '',
-              details: {},
-              parts: [],
-              history: {
-                status: [],
-                parts: []
-              }
-            };
-          }
           currentMarker = this;
           showContextMenu(markerEvent);
         });
@@ -1361,10 +1333,10 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
   });
 
   // Listen for changes in Firebase
-  onValue(mapRef, (snapshot) => {
+  onValue(markersRef, (snapshot) => {
     const mapState = snapshot.val();
     if (mapState && mapState.markers) {
-      // Clear existing markers
+      // Only clear existing markers
       map.eachLayer((layer) => {
         if (layer instanceof L.Marker) {
           map.removeLayer(layer);
@@ -1379,19 +1351,12 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
         }).addTo(map)
         .on('click', function(markerEvent) {
           markerEvent.originalEvent.stopPropagation();
-          if (!this.markerData) {
-            this.markerData = markerData.markerData;
-          }
           currentMarker = this;
           showContextMenu(markerEvent);
         });
 
         marker.markerData = markerData.markerData;
       });
-
-      // Restore map view
-      map.setView(mapState.center, mapState.zoom);
-      map.setBearing(mapState.bearing);
     }
   });
 
