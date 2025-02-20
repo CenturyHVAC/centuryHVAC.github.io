@@ -531,6 +531,33 @@ body, html {
   height: 16px;
 }
 
+/* Lock Markers Button Styles */
+#marker-lock-toggle {
+  position: absolute;
+  left: 10px;
+  top: calc(10px + 5 * 35px); /* Position it below the unit list toggle */
+  z-index: 1000;
+  padding: 10px;
+  border-radius: 4px;
+  background-color: white;
+  border: none;
+  cursor: pointer;
+  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.5);
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+#marker-lock-toggle:hover {
+  background-color: #f0f0f0;
+}
+
+#marker-lock-toggle.locked {
+  background-color: #e9ecef;
+}
+
 /* Update the delete toggle button to match styling */
 #toggle-delete-buttons {
   background-color: #dc3545;

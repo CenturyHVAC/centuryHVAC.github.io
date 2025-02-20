@@ -67,6 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let rightClickPos = null; // Store position of right click
   let draggedItem = null; // Store the item being dragged
   let isListLocked = true; // List is locked by default
+  let areMarkersLocked = false; // Add this near the top with other state variables
 
   // Create right-click context menu
   const mapContextMenu = document.createElement('div');
@@ -613,6 +614,12 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
     if (!currentMarker || !contextMenu) return;
 
     try {
+      // Hide the unit list panel when context menu opens
+      const unitListPanel = document.getElementById('unit-list-panel');
+      if (unitListPanel) {
+        unitListPanel.classList.remove('visible');
+      }
+
       // Initialize marker data if needed
       if (!currentMarker.markerData) {
         currentMarker.markerData = {
@@ -1222,7 +1229,7 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
   // Function to create a marker
   function createMarkerFromData(key, data) {
     const marker = L.marker(data.latlng, {
-      draggable: true
+      draggable: !areMarkersLocked
     }).addTo(map);
     
     marker.markerData = {
@@ -1249,18 +1256,16 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
 
     // Add drag end event listener
     marker.on('dragend', function(e) {
-      // Get the new position
-      const newPos = e.target.getLatLng();
-      
-      // Update Firebase with new position
-      if (marker.firebaseKey) {
-        markersRef.child(marker.firebaseKey).update({
-          latlng: newPos
-        }).catch(error => {
-          console.error('Error updating marker position:', error);
-          // Optionally revert the marker position if update fails
-          marker.setLatLng(data.latlng);
-        });
+      if (!areMarkersLocked) {
+        const newPos = e.target.getLatLng();
+        if (marker.firebaseKey) {
+          markersRef.child(marker.firebaseKey).update({
+            latlng: newPos
+          }).catch(error => {
+            console.error('Error updating marker position:', error);
+            marker.setLatLng(data.latlng);
+          });
+        }
       }
     });
 
@@ -1290,6 +1295,38 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
     updateLockState();
     return marker;
   }
+
+  function initializeMarkerLockToggle() {
+    const markerLockToggle = document.getElementById('marker-lock-toggle');
+    
+    markerLockToggle.addEventListener('click', () => {
+      areMarkersLocked = !areMarkersLocked;
+      markerLockToggle.classList.toggle('locked');
+      
+      // Update the lock icon
+      markerLockToggle.innerHTML = areMarkersLocked ? `
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+      ` : `
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+        </svg>
+      `;
+
+      // Update all existing markers
+      markersMap.forEach(marker => {
+        marker.dragging.enable();
+        if (areMarkersLocked) {
+          marker.dragging.disable();
+        }
+      });
+    });
+  }
+
+  initializeMarkerLockToggle();
 
   // Define custom icons
   const greenIcon = L.icon({
