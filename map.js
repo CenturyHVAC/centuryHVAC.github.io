@@ -1222,7 +1222,7 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
   // Function to create a marker
   function createMarkerFromData(key, data) {
     const marker = L.marker(data.latlng, {
-      draggable: false
+      draggable: true
     }).addTo(map);
     
     marker.markerData = {
@@ -1245,14 +1245,44 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
     };
     
     marker.firebaseKey = key;
-    marker.listPosition = data.position || 0; // Store position
+    marker.listPosition = data.position || 0;
 
+    // Add drag end event listener
+    marker.on('dragend', function(e) {
+      // Get the new position
+      const newPos = e.target.getLatLng();
+      
+      // Update Firebase with new position
+      if (marker.firebaseKey) {
+        markersRef.child(marker.firebaseKey).update({
+          latlng: newPos
+        }).catch(error => {
+          console.error('Error updating marker position:', error);
+          // Optionally revert the marker position if update fails
+          marker.setLatLng(data.latlng);
+        });
+      }
+    });
+
+    // Set a flag when drag starts
+    marker.on('dragstart', function() {
+      marker._isDragging = true;
+    });
+
+    // Reset flag and handle regular click
     marker.on('click', function(e) {
       e.originalEvent.stopPropagation();
-      currentMarker = this;
-      showContextMenu({
-        containerPoint: map.latLngToContainerPoint(marker.getLatLng())
-      });
+      // Only show context menu if we're not dragging
+      if (!this._isDragging) {
+        currentMarker = this;
+        showContextMenu({
+          containerPoint: map.latLngToContainerPoint(marker.getLatLng())
+        });
+      }
+      // Reset the dragging flag after a short delay
+      setTimeout(() => {
+        this._isDragging = false;
+      }, 10);
     });
 
     setMarkerIcon(marker);
