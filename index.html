@@ -1,1088 +1,507 @@
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rotatable Leaflet Map</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-rotate@0.1.2/dist/leaflet-rotate.css" />
-    <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            overflow: hidden;
-            font-family: Arial, sans-serif;
-        }
-        #map {
-            height: 100%;
-            width: 100%;
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
-        #rotation-control {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1000;
-            width: 80%;
-            max-width: 400px;
-            text-align: center;
-            opacity: 0.1; /* Default transparency */
-            transition: opacity 0.3s ease; /* Smooth transition for opacity */
-        }
-        #rotation-control:hover, #rotation-control:focus-within {
-            opacity: 0.6; /* Opacity on hover */
-        }
-        #rotation-slider {
-            width: 100%;
-            background: rgba(255, 255, 255, 0.7);
-            border-radius: 10px;
-        }
-        #rotation-display {
-            color: white;
-            background: rgba(0, 0, 0, 0.5);
-            padding: 5px 10px;
-            border-radius: 5px;
-            margin-bottom: 10px;
-            display: inline-block;
-        }
-        #add-marker-button {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            z-index: 1000;
-            padding: 10px 15px;
-            border: none;
-            border-radius: 5px;
-            background-color: rgba(255, 255, 255, 0.8);
-            cursor: pointer;
-        }
-        #add-marker-button:hover {
-            background-color: rgba(230, 230, 230, 0.9);
-        }
-        #add-marker-button.active {
-            background-color: rgba(200, 200, 255, 0.9);
-        }
-
-        /* New Context Menu Styles - Clean and Professional */
-        .context-menu {
-            position: absolute;
-            width: 400px;
-            max-height: 80%;
-            overflow: auto;
-            background: #fefefe;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            box-shadow: 0 2px 7px rgba(0,0,0,0.08);
-            z-index: 1000;
-            font-size: 0.95em;
-        }
-        .context-menu.hidden {
-            display: none;
-        }
-        .context-menu-tabs {
-            display: flex;
-            border-bottom: 1px solid #eee;
-        }
-        .context-menu-tabs .tab {
-            flex-grow: 1;
-            padding: 8px 10px;
-            text-align: center;
-            background: #f9f9f9;
-            border: none;
-            cursor: pointer;
-            font-weight: normal;
-            color: #555;
-        }
-        .context-menu-tabs .tab:hover {
-            background: #f0f0f0;
-        }
-        .context-menu-tabs .tab.active {
-            background: #fff;
-            font-weight: 500;
-            border-bottom: 2px solid #007bff;
-            color: #333;
-        }
-        .tab-content {
-            padding: 15px;
-            max-height: 500px;
-            overflow-y: auto;
-        }
-        .tab-panel {
-            display: none;
-        }
-        .tab-panel.active {
-            display: block;
-        }
-        .hidden {
-            display: none !important;
-        }
-        .status-display {
-            display: flex;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .status-text {
-            margin-left: 10px;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.9em;
-        }
-        .status-text.status-up { background-color: #4caf50; color: white; }
-        .status-text.status-down { background-color: #f44336; color: white; }
-        .status-text.status-limited { background-color: #ff9800; color: white; }
-        .edit-status-btn, .delete-marker-btn, #show-add-parts-btn, #save-new-part-btn, #save-status-btn, .edit-part-btn, .delete-part-btn {
-            background-color: #e9ecef;
-            color: #495057;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
-            padding: 6px 12px;
-            cursor: pointer;
-            font-size: 0.9em;
-            transition: background-color 0.2s ease;
-            margin-left: 10px; /* Add margin to separate buttons */
-        }
-        .edit-status-btn:hover, .delete-marker-btn:hover, #show-add-parts-btn:hover, #save-new-part-btn:hover, #save-status-btn:hover, .edit-part-btn:hover, .delete-part-btn:hover {
-            background-color: #d8dce0;
-        }
-        .edit-status-btn svg, .delete-marker-btn svg {
-            vertical-align: middle;
-        }
-
-        .form-input {
-            width: calc(100% - 18px);
-            margin-bottom: 8px;
-            padding: 7px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 0.9em;
-        }
-        .btn {
-            padding: 8px 15px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .btn-primary, #add-marker-button {
-            background-color: #007bff;
-            color: white;
-        }
-        .btn-primary:hover, #add-marker-button:hover {
-            background-color: #0056b3;
-        }
-        .btn-secondary {
-            background-color: #6c757d;
-            color: white;
-        }
-        .context-menu-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background-color: #f8f9fa;
-            padding: 10px 15px;
-            border-bottom: 2px solid #c4c4c4; 
-            font-size: 1em;
-            color: #343a40;
-        }
-        .header-unit-id {
-            display: flex;
-            align-items: center;
-            justify-content: flex-start;  
-            flex: 1;
-            gap: 6px;
-            padding-left: 150px;  
-        }
-        .header-unit-id span {
-            font-weight: bold; 
-        }
-        .header-unit-id .icon-button {
-            margin-left: 0px; /* Tighten the spacing between buttons */
-        }
-
-        .header-buttons {
-            display: flex;
-            align-items: center;
-        }
-
-        .header-button {
-            padding: 4px 8px;
-            background: #e9ecef;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
-            cursor: pointer;
-            color: #495057;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s ease;
-        }
-
-        .header-button:hover {
-            background: #d8dce0;
-            border-color: #adb5bd;
-        }
-        .edit-unit-id-btn, .delete-marker-btn {
-            padding: 4px 8px;
-            background: #e9ecef;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
-            cursor: pointer;
-            color: #495057;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s ease;
-        }
-
-        .edit-unit-id-btn:hover, .delete-marker-btn:hover {
-            background: #d8dce0;
-            border-color: #adb5bd;
-        }
-        .header-button.delete-marker-btn:hover {
-            background: #dc3545;
-            border-color: #dc3545;
-            color: white;
-        }
-        .scrollable-history {
-            max-height: 200px;
-            overflow-y: auto;
-            padding: 8px;
-            border: 1px solid #eee;
-            font-size: 0.85em;
-            scrollbar-width: thin;
-            scrollbar-color: #888 #f1f1f1;
-            word-break: break-word;
-        }
-        .scrollable-history::-webkit-scrollbar {
-            width: 8px;
-        }
-        .scrollable-history::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 4px;
-        }
-        .scrollable-history::-webkit-scrollbar-thumb {
-            background: #888;
-            border-radius: 4px;
-        }
-        .scrollable-history::-webkit-scrollbar-thumb:hover {
-            background: #555;
-        }
-        .history-entry {
-            margin-bottom: 8px;
-            padding: 6px;
-            background-color: #fefefe;
-            border-radius: 3px;
-            border: 1px solid #f0f0f0;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-        .history-date {
-            color: #777;
-            font-size: 0.8em;
-            margin-bottom: 4px;
-            align-self: flex-start;
-        }
-        .history-status {
-            font-weight: bold;
-            margin-bottom: 4px;
-            align-self: flex-start;
-        }
-        .history-notes {
-            color: #555;
-            font-style: italic;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            max-width: 100%;
-        }
-        .parts-list-container {
-            max-height: 180px;
-            overflow-y: auto;
-            border: 1px solid #eee;
-            margin-top: 5px;
-        }
-        .parts-list {
-            list-style-type: none;
-            padding: 0;
-            margin: 0;
-        }
-        .part-entry {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 10px;
-            border-bottom: 1px solid #eee;
-            font-size: 0.9em;
-        }
-        .part-entry:last-child {
-            border-bottom: none;
-        }
-        .part-actions {
-            display: flex;
-            gap: 5px;
-        }
-        .parts-list-actions {
-            margin-bottom: 10px;
-        }
-        .parts-input-container {
-            padding-bottom: 10px;
-        }
-        #latest-notes-display {
-            color: #666;
-            font-style: italic;
-            margin-top: 5px;
-            padding: 5px;
-            background-color: #f9f9f9;
-            border-radius: 4px;
-            display: none;
-        }
-        #latest-notes-display.has-notes {
-            display: block;
-        }
-        /* Additional styles for Details tab */
-        .details-grid {
-            display: grid;
-            grid-template-columns: auto 1fr;
-            gap: 10px;
-            align-items: center;
-        }
-        .details-grid label {
-            font-weight: bold;
-            color: #555;
-        }
-        .details-grid input, .details-grid select {
-            width: 100%;
-            padding: 6px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background-color: #f9f9f9;
-        }
-        .details-grid input:disabled, .details-grid select:disabled {
-            background-color: #f1f1f1;
-            color: #666;
-            cursor: not-allowed;
-        }
-        .details-display {
-            background-color: #f9f9f9;
-            border: 1px solid #e0e0e0;
-            border-radius: 4px;
-            padding: 10px;
-            margin-top: 10px;
-            font-family: monospace;
-            white-space: pre-wrap;
-            user-select: text;
-            cursor: text;
-        }
-        #edit-details-btn {
-            margin-top: 10px;
-            margin-right: 10px;
-        }
-        
-        /* Map Context Menu Styles */
-        .map-context-menu {
-            position: absolute;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            padding: 5px 0;
-            z-index: 1000;
-        }
-        
-        .map-context-menu.hidden {
-            display: none;
-        }
-        
-        .map-context-menu-item {
-            padding: 8px 15px;
-            cursor: pointer;
-            color: #333;
-            font-size: 14px;
-        }
-        
-        .map-context-menu-item:hover {
-            background-color: #f0f0f0;
-        }
-        /* Add these styles for consistent icon buttons */
-        .icon-button {
-            background: transparent;
-            border: none;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 4px;
-            border-radius: 4px;
-            transition: background-color 0.2s ease;
-        }
-        .icon-button:hover {
-            background-color: rgba(0,0,0,0.1);
-        }
-        .icon-button svg {
-            width: 16px;
-            height: 16px;
-            stroke: #495057;
-            stroke-width: 2;
-        }
-        .icon-button.delete-btn:hover svg {
-            stroke: #dc3545;
-        }
-
-        /* Marker List Styles */
-        #marker-list-toggle {
-            position: absolute;
-            top: 155px; /* Position under the zoom controls */
-            left: 10px; /* Left side of the page */
-            z-index: 1000;
-            padding: 10px 15px;
-            border: none;
-            border-radius: 5px;
-            background-color: rgba(255, 255, 255, 0.8);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            transition: background-color 0.3s ease;
-        }
-
-        #marker-list-toggle:hover {
-            background-color: rgba(230, 230, 230, 0.9);
-        }
-
-        #marker-list-toggle.active {
-            background-color: rgba(200, 200, 255, 0.9);
-        }
-
-        #marker-list-container {
-            position: absolute;
-            top: 0;
-            right: -350px; /* Hidden by default, on the right side */
-            width: 350px;
-            height: 100%;
-            background-color: rgba(255, 255, 255, 0.95);
-            border-radius: 10px 0 0 10px; /* Rounded on the left side */
-            box-shadow: -2px 0 10px rgba(0,0,0,0.1);
-            z-index: 1000;
-            transition: right 0.3s ease;
-            overflow-y: auto;
-            padding: 15px;
-            border-left: 1px solid #e0e0e0;
-        }
-
-        #marker-list-container.visible {
-            right: 0; /* Slide in from the right */
-        }
-
-        .marker-list-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-            cursor: move;
-            user-select: none;
-            transition: background-color 0.2s ease;
-        }
-
-        .marker-list-item:hover {
-            background-color: #f0f0f0;
-        }
-
-        .marker-list-item.dragging {
-            opacity: 0.5;
-        }
-
-        .marker-list-item.drag-over {
-            border: 2px dashed #007bff;
-        }
-
-        .marker-list-item-unit-id {
-            font-weight: bold;
-        }
-
-        .marker-list-item-status {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.8em;
-        }
-
-        .marker-list-item-status.status-up { background-color: #4caf50; color: white; }
-        .marker-list-item-status.status-down { background-color: #f44336; color: white; }
-        .marker-list-item-status.status-limited { background-color: #ff9800; color: white; }
-        
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 2000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0,0,0,0.4);
-        }
-
-        .modal-content {
-            background-color: #fefefe;
-            margin: 15% auto;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 500px;
-            border-radius: 10px;
-        }
-
-        .marker-input-row {
-            display: flex;
-            margin-bottom: 10px;
-            align-items: center;
-        }
-
-        .marker-input-row input {
-            flex-grow: 1;
-            margin-right: 10px;
-        }
-
-        .close-modal {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        .close-modal:hover {
-            color: black;
-        }
-
-        #multiple-markers-container {
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .modal-actions {
-            display: flex;
-            justify-content: flex-end;
-            margin-top: 15px;
-        }
-
-        .modal-actions button {
-            margin-left: 10px;
-        }
-        
-        /* Styles for search and filter */
-        .marker-list-search {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        
-        .marker-list-filters {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 10px;
-            justify-content: space-between;
-        }
-        
-        .marker-list-filters label {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-        
-        /* Add new styles for PIN modal */
-        .pin-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 3000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .pin-modal-content {
-            background-color: white;
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-            width: 300px;
-            text-align: center;
-            /* Ensure it's centered both horizontally and vertically */
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
-        .pin-input {
-            width: 200px;
-            padding: 10px;
-            margin: 20px 0;
-            font-size: 24px;
-            text-align: center;
-            letter-spacing: 5px;
-            border: 2px solid #ddd;
-            border-radius: 5px;
-        }
-
-        .pin-submit {
-            padding: 10px 20px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-
-        .pin-submit:hover {
-            background-color: #0056b3;
-        }
-
-        .pin-error {
-            color: #dc3545;
-            margin-top: 10px;
-            display: none;
-        }
-
-        /* Modify existing map container style */
-        #map-container {
-            display: none; /* Hide map initially */
-            height: 100%;
-            width: 100%;
-            position: relative;
-        }
-
-        /* Mobile-friendly adjustments */
-        @media (max-width: 368px) {
-            .context-menu {
-                position: fixed;
-                width: 100%;
-                height: 50vh;
-                left: 0;
-                bottom: 0;
-                top: auto;
-                border-radius: 15px 15px 0 0;
-                box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-                z-index: 2000;
-            }
-
-            .context-menu-header {
-                padding: 15px;
-            }
-
-            .header-unit-id {
-                padding-left: 20px;
-            }
-
-            .tab-content {
-                max-height: calc(90vh - 120px);
-                overflow-y: auto;
-            }
-
-            #marker-list-container {
-                position: fixed;
-                top: auto;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                width: 100%;
-                height: 80vh;
-                border-radius: 15px 15px 0 0;
-                transform: translateY(100%);
-                transition: transform 0.3s ease;
-            }
-
-            #marker-list-container.visible {
-                transform: translateY(0);
-                right: 0;
-            }
-
-            .modal-content {
-                width: 90%;
-                max-width: 500px;
-                margin: 10% auto;
-            }
-
-            #rotation-control {
-                bottom: 60px;
-                width: 90%;
-            }
-
-            .pin-modal-content {
-                width: 90%;
-                max-width: 300px;
-                padding: 20px;
-            }
-
-            .pin-input {
-                width: 80%;
-                max-width: 200px;
-            }
-
-            /* Adjust button sizes for better touch targets */
-            button, .btn {
-                min-height: 44px;
-                padding: 12px 20px;
-            }
-
-            .icon-button {
-                min-height: 44px;
-                min-width: 44px;
-            }
-
-            /* Make form inputs more touch-friendly */
-            input[type="text"],
-            input[type="password"],
-            select,
-            textarea {
-                font-size: 16px; /* Prevent zoom on iOS */
-                padding: 12px;
-                min-height: 44px;
-            }
-
-            /* Adjust marker list items for touch */
-            .marker-list-item {
-                padding: 15px;
-                min-height: 44px;
-            }
-
-            /* Make checkboxes more touch-friendly */
-            input[type="checkbox"] {
-                width: 20px;
-                height: 20px;
-            }
-
-            /* Adjust filters layout */
-            .marker-list-filters {
-                flex-wrap: wrap;
-                gap: 15px;
-            }
-
-            .marker-list-filters label {
-                font-size: 16px;
-            }
-
-            /* Handle landscape mode */
-            @media (orientation: landscape) {
-                .context-menu {
-                    height: 100vh;
-                }
-
-                .tab-content {
-                    max-height: calc(100vh - 120px);
-                }
-
-                #marker-list-container {
-                    height: 100vh;
-                }
-            }
-
-            /* Adjust control positions */
-            #add-marker-button {
-                bottom: 100px;
-            }
-
-            #marker-list-toggle {
-                top: auto;
-                bottom: 20px;
-                left: 20px;
-            }
-
-            /* Prevent text selection during touch */
-            * {
-                -webkit-tap-highlight-color: transparent;
-                -webkit-touch-callout: none;
-                user-select: none;
-            }
-
-            /* Allow text selection in specific areas */
-            input, textarea, .details-display {
-                user-select: text;
-            }
-
-            /* Improve scrolling */
-            .scrollable-history,
-            .parts-list-container,
-            #multiple-markers-container {
-                -webkit-overflow-scrolling: touch;
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .context-menu {
-                position: fixed;
-                width: 90%;
-                max-width: 400px;
-                max-height: 80vh;
-                overflow-y: auto;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-            }
-
-            .context-menu-header {
-                cursor: move;
-                user-select: none;
-                -webkit-user-select: none;
-            }
-
-            .icon-button {
-                cursor: pointer;
-                z-index: 10;
-                position: relative;
-                padding: 8px; /* Increase touch target size */
-            }
-
-            /* Increase touch target size for header buttons */
-            .header-unit-id .icon-button,
-            .close-btn {
-                min-width: 44px;
-                min-height: 44px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin: 0 2px;
-            }
-
-            /* Ensure SVG icons are centered in the bigger touch targets */
-            .icon-button svg {
-                width: 24px;
-                height: 24px;
-            }
-
-            /* Add spacing between header elements */
-            .header-unit-id {
-                gap: 8px;
-            }
-
-            /* Improve touch handling for marker list items */
-            .marker-list-item {
-                touch-action: pan-y pinch-zoom;
-                -webkit-user-select: none;
-                user-select: none;
-                position: relative;
-                z-index: 1;
-            }
-
-            .marker-list-item.dragging {
-                background: #f8f9fa;
-                opacity: 0.8;
-                position: absolute;
-                left: 0;
-                right: 0;
-                z-index: 1000;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            }
-
-            .marker-list-item.drag-over {
-                border-top: 2px solid #007bff;
-            }
-
-            /* Improve scrolling in the marker list */
-            #marker-list {
-                overflow-y: auto;
-                -webkit-overflow-scrolling: touch;
-                padding-bottom: 60px; /* Add space for the last item when dragging */
-            }
-        }
-    </style>
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet-rotate@0.1.2/dist/leaflet-rotate.js"></script>
-    <script type="module" src="map.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Rotatable Leaflet Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-rotate@0.1.2/dist/leaflet-rotate.css" />
+  <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
-    <!-- Add PIN modal -->
-    <div id="pin-modal" class="pin-modal">
-        <div class="pin-modal-content">
-            <h2>Enter PIN</h2>
-            <form id="pin-form">
-                <input type="password" id="pin-input" class="pin-input" maxlength="4" placeholder="****" required>
-                <div id="pin-error" class="pin-error">Incorrect PIN</div>
-                <button type="submit" class="pin-submit">Submit</button>
-            </form>
-        </div>
+  <div class="pin-overlay" id="pin-overlay">
+    <div class="pin-container" id="pin-container">
+      <h2 class="pin-title">Enter PIN</h2>
+      <div class="pin-display">
+        <div class="pin-digit"></div>
+        <div class="pin-digit"></div>
+        <div class="pin-digit"></div>
+        <div class="pin-digit"></div>
+      </div>
+      <div class="pin-keypad">
+        <button class="pin-key">1</button>
+        <button class="pin-key">2</button>
+        <button class="pin-key">3</button>
+        <button class="pin-key">4</button>
+        <button class="pin-key">5</button>
+        <button class="pin-key">6</button>
+        <button class="pin-key">7</button>
+        <button class="pin-key">8</button>
+        <button class="pin-key">9</button>
+        <button class="pin-key">←</button>
+        <button class="pin-key">0</button>
+        <button class="pin-key">✓</button>
+      </div>
+    </div>
+  </div>
+
+  <button id="unit-list-toggle">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </button>
+
+  <div id="map"></div>
+  <div id="unit-list-panel">
+    <div class="unit-list-header">
+      Unit List <span id="unit-count">(0)</span>
     </div>
 
-    <!-- Wrap existing content in a container -->
-    <div id="map-container">
-        <button id="add-marker-button">Add Unit</button>
-        <button id="marker-list-toggle" title="Unit List">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="8" y1="6" x2="21" y2="6"></line>
-                <line x1="8" y1="12" x2="21" y2="12"></line>
-                <line x1="8" y1="18" x2="21" y2="18"></line>
-                <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                <line x1="3" y1="18" x2="3.01" y2="18"></line>
-            </svg>
+    <div id="building-container" class="collapsible">
+      <div class="collapsible-header">
+        Add/Delete
+        <button id="toggle-building-section" class="toggle-button">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
         </button>
-        <div id="map"></div>
-        <div id="rotation-control">
-            <div id="rotation-display">163</div>
-            <input type="range" id="rotation-slider" min="0" max="360" value="163">
+      </div>
+      <div class="collapsible-content">
+      
+        <div id="add-building-container">
+          <button id="toggle-delete-buttons">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="6" x2="5" y2="6"></line>
+            <line x1="21" y1="6" x2="19" y2="6"></line>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+            <line x1="14" y1="11" x2="14" y2="17"></line>
+          </svg>
+          </button>
+          
+          <input type="text" id="building-name-input" placeholder="Building Name">
+          <button id="add-building-button">+</button>
+          <button id="toggle-lock-button" title="Toggle list position lock">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+          </button>
         </div>
-
-        <div id="marker-list-container">
-            <h3>Unit List</h3>
-            <input type="text" id="marker-list-search" class="marker-list-search" placeholder="Search Units...">
-            <div class="marker-list-filters">
-                <label>
-                    <input type="checkbox" id="filter-up" checked>
-                    UP
-                </label>
-                <label>
-                    <input type="checkbox" id="filter-limited" checked>
-                    Limited
-                </label>
-                <label>
-                    <input type="checkbox" id="filter-down" checked>
-                    Down
-                </label>
-            </div>
-            <div id="marker-list"></div>
-        </div>
-
-        <div id="context-menu" class="context-menu hidden">
-            <div class="context-menu-header" id="context-menu-header">
-                <div class="header-unit-id">
-                    <span id="unit-id-display">UNIT-ID</span>
-                    <button class="icon-button edit-unit-id-btn" title="Edit Unit ID">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                        </svg>
-                    </button>
-                    <button class="icon-button delete-btn delete-marker-btn" title="Delete Unit">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                            <line x1="10" y1="11" x2="10" y2="17"></line>
-                            <line x1="14" y1="11" x2="14" y2="17"></line>
-                        </svg>
-                    </button>
-                </div>
-                <button class="icon-button close-btn" title="Close">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </button>
-            </div>
-            <div class="context-menu-tabs">
-                <button class="tab active" data-tab="status">Status</button>
-                <button class="tab" data-tab="parts">Parts</button>
-                <button class="tab" data-tab="details">Details</button>
-                <button class="tab" data-tab="history">History</button>
-            </div>
-            <div class="tab-content">
-                <div id="status-tab" class="tab-panel active">
-                    <div class="status-display">
-                        <span>Current Status: </span>
-                        <strong id="current-status-display" class="status-text"></strong>
-                        <button id="edit-status-btn" class="icon-button edit-btn" title="Edit Status">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                            </svg>
-                        </button>
-                    </div>
-                    <div id="latest-notes-display" class="latest-notes"></div>
-                    <div id="status-edit-section" class="hidden">
-                        <select id="unit-status" class="form-input">
-                            <option value="up" class="status-up">UP</option>
-                            <option value="down" class="status-down">DOWN</option>
-                            <option value="limited" class="status-limited">LIMITED</option>
-                        </select>
-                        <textarea id="status-notes" placeholder="Additional status notes" class="form-input"></textarea>
-                        <button id="save-status-btn" class="btn btn-primary">Save Status</button>
-                    </div>
-                </div>
-                <div id="parts-tab" class="tab-panel">
-                    <div class="parts-input-container hidden" id="add-parts-input">
-                        <div class="parts-input-row">
-                            <input type="text" id="part-name" placeholder="Part Name" class="form-input">
-                            <input type="text" id="part-number" placeholder="Part Number" class="form-input">
-                        </div>
-                        <div class="parts-input-row">
-                            <label for="part-replacement-date" class="date-label">Replacement Date:</label>
-                            <input type="date" id="part-replacement-date" class="form-input date-input">
-                            <button id="save-new-part-btn" class="btn btn-primary">Save Part</button>
-                        </div>
-                    </div>
-                    <div class="parts-list-actions">
-                        <button id="show-add-parts-btn" class="btn btn-primary">Add Part</button>
-                    </div>
-                    <div class="parts-list-container">
-                        <ul id="parts-list" class="parts-list"></ul>
-                    </div>
-                </div>
-                <div id="details-tab" class="tab-panel">
-                    <div class="details-actions">
-                        <button id="edit-details-btn" class="btn btn-secondary">Edit Details</button>
-                        <button id="save-details-btn" class="btn btn-primary" style="display: none;">Save Details</button>
-                    </div>
-                    <div class="details-display" id="details-display"></div>
-                    <div class="details-grid" style="display: none;">
-                        <label for="unit-brand">Brand:</label>
-                        <input type="text" id="unit-brand" class="form-input" disabled>
-
-                        <label for="unit-model">Model:</label>
-                        <input type="text" id="unit-model" class="form-input" disabled>
-
-                        <label for="unit-serial">Serial:</label>
-                        <input type="text" id="unit-serial" class="form-input" disabled>
-
-                        <label for="unit-mfg-date">Mfg Date:</label>
-                        <input type="date" id="unit-mfg-date" class="form-input" disabled>
-
-                        <label for="unit-freon-type">Freon Type:</label>
-                        <select id="unit-freon-type" class="form-input" disabled>
-                            <option value="">Select Freon Type</option>
-                            <option value="R-22">R-22</option>
-                            <option value="R-410A">R-410A</option>
-                            <option value="R-134A">R-134A</option>
-                            <option value="R-407C">R-407C</option>
-                            <option value="Other">Other</option>
-                        </select>
-                    </div>
-                </div>
-                <div id="history-tab" class="tab-panel">
-                    <div id="status-history" class="scrollable-history"></div>
-                    <div id="parts-history" class="scrollable-history"></div>
-                </div>
-            </div>
-        </div>
-
-        <div id="map-context-menu" class="map-context-menu hidden">
-            <div class="map-context-menu-item" id="add-unit-marker-btn">
-                Add Unit Marker
-            </div>
-        </div>
-
-        <div id="multiple-markers-modal" class="modal">
-            <div class="modal-content">
-                <span class="close-modal">&times;</span>
-                <h2>Add Multiple Units</h2>
-                <div id="multiple-markers-container">
-                    <div class="marker-input-row">
-                        <input type="text" class="unit-id-input" placeholder="UNIT-ID">
-                        <button class="remove-marker-row">-</button>
-                    </div>
-                </div>
-                <button id="add-marker-row-btn">+ Add Another Unit</button>
-                <div class="modal-actions">
-                    <button id="save-multiple-markers-btn">Save Units</button>
-                    <button id="cancel-multiple-markers-btn">Cancel</button>
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
-    
+
+    <div class="unit-list-search">
+      <input type="text" id="unit-search" placeholder="Search units...">
+    </div>
+    <div class="status-filter">
+      <button class="status-filter-btn status-all active" data-status="all">ALL</button>
+      <button class="status-filter-btn status-up" data-status="up">UP</button>
+      <button class="status-filter-btn status-down" data-status="down">DOWN</button>
+      <button class="status-filter-btn status-limited" data-status="limited">LIMITED</button>
+    </div>
+    <ul class="unit-list" id="unit-list"></ul>
+  </div>
+  <div id="rotation-control">
+    <div id="rotation-display">163</div>
+    <input type="range" id="rotation-slider" min="0" max="360" value="163">
+  </div>
+
+  <div id="context-menu" class="context-menu hidden">
+    <div class="context-menu-header" id="context-menu-header">
+      <span id="header-unit-id">UNIT-ID</span>
+      <button id="edit-unit-id-btn" class="edit-header-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+        </svg>
+      </button>
+    </div>
+    <div class="context-menu-tabs">
+      <button class="tab active" data-tab="status">Status</button>
+      <button class="tab" data-tab="parts">Parts</button>
+      <button class="tab" data-tab="details">Details</button>
+      <button class="tab" data-tab="history">History</button>
+    </div>
+    <div class="tab-content">
+      <div id="status-tab" class="tab-panel active">
+        <div class="status-display">
+          <span>Current Status: </span>
+          <strong id="current-status-display" class="status-text"></strong>
+          <button id="edit-status-btn" class="edit-header-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+          </button>
+        </div>
+        <div id="latest-notes-display" class="latest-notes"></div>
+        <div id="status-edit-section" class="hidden">
+          <select id="unit-status" class="form-input">
+            <option value="up" class="status-up">UP</option>
+            <option value="down" class="status-down">DOWN</option>
+            <option value="limited" class="status-limited">LIMITED</option>
+          </select>
+          <textarea id="status-notes" placeholder="Additional status notes" class="form-input"></textarea>
+          <div class="status-image-edit">
+            <label for="status-image-url">Status Image URL:</label>
+            <input type="text" id="status-image-url" placeholder="Enter image URL" class="form-input">
+          </div>
+          <button id="save-status-btn" class="btn btn-primary">Save Status</button>
+        </div>
+        <div class="status-image-container">
+          <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTN3lFE1mgBbxtpLcZeDQVMNl-JX0w5cI6pzQ&s" alt="Status Details" class="status-image">
+        </div>
+      </div>
+      <div id="parts-tab" class="tab-panel">
+        <div class="parts-input-container hidden" id="add-parts-input">
+          <div class="parts-input-row">
+            <input type="text" id="part-name" placeholder="Part Name" class="form-input">
+            <input type="text" id="part-number" placeholder="Part Number" class="form-input">
+          </div>
+          <div class="parts-input-row">
+            <label for="part-replacement-date" class="date-label">Replacement Date:</label>
+            <input type="date" id="part-replacement-date" class="form-input date-input">
+            <button id="save-new-part-btn" class="btn btn-primary">Save Part</button>
+          </div>
+        </div>
+        <div class="parts-list-actions">
+          <button id="show-add-parts-btn" class="btn btn-primary">Add Part</button>
+        </div>
+        <div class="parts-list-container">
+          <ul id="parts-list" class="parts-list"></ul>
+        </div>
+      </div>
+      <div id="details-tab" class="tab-panel">
+        <div class="details-actions">
+          <button id="edit-details-btn" class="btn btn-secondary">Edit Details</button>
+          <button id="save-details-btn" class="btn btn-primary" style="display: none;">Save Details</button>
+        </div>
+        <div class="details-display" id="details-display"></div>
+        <div class="details-grid" style="display: none;">
+          <label for="unit-brand">Brand:</label>
+          <input type="text" id="unit-brand" class="form-input" disabled>
+
+          <label for="unit-model">Model:</label>
+          <input type="text" id="unit-model" class="form-input" disabled>
+
+          <label for="unit-serial">Serial:</label>
+          <input type="text" id="unit-serial" class="form-input" disabled>
+
+          <label for="unit-mfg-date">Mfg Date:</label>
+          <input type="date" id="unit-mfg-date" class="form-input" disabled>
+
+          <label for="unit-freon-type">Freon Type:</label>
+          <select id="unit-freon-type" class="form-input" disabled>
+            <option value="">Select Freon Type</option>
+            <option value="R-22">R-22</option>
+            <option value="R-410A">R-410A</option>
+            <option value="R-134A">R-134A</option>
+            <option value="R-407C">R-407C</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div id="history-tab" class="tab-panel">
+        <div id="status-history" class="scrollable-history"></div>
+        <div id="parts-history" class="scrollable-history"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-rotate@0.1.2/dist/leaflet-rotate.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
+  <script src="map.js"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const contextMenu = document.getElementById('context-menu');
+      const contextMenuHeader = document.getElementById('context-menu-header');
+
+      if (contextMenu && contextMenuHeader) {
+        let isDragging = false;
+        let currentX;
+        let currentY;
+        let initialX;
+        let initialY;
+        let xOffset = 0;
+        let yOffset = 0;
+
+        contextMenuHeader.addEventListener('mousedown', dragStart);
+        contextMenuHeader.addEventListener('touchstart', dragStart);
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('touchmove', drag);
+        document.addEventListener('mouseup', dragEnd);
+        document.addEventListener('touchend', dragEnd);
+
+        function dragStart(e) {
+          if (e.type === 'touchstart') {
+            initialX = e.touches[0].clientX - xOffset;
+            initialY = e.touches[0].clientY - yOffset;
+          } else {
+            initialX = e.clientX - xOffset;
+            initialY = e.clientY - yOffset;
+          }
+
+          if (e.target === contextMenuHeader) {
+            isDragging = true;
+          }
+        }
+
+        function drag(e) {
+          if (isDragging) {
+            e.preventDefault();
+
+            if (e.type === 'touchmove') {
+              currentX = e.touches[0].clientX - initialX;
+              currentY = e.touches[0].clientY - initialY;
+            } else {
+              currentX = e.clientX - initialX;
+              currentY = e.clientY - initialY;
+            }
+
+            xOffset = currentX;
+            yOffset = currentY;
+
+            setTranslate(currentX, currentY, contextMenu);
+          }
+        }
+
+        function dragEnd(e) {
+          initialX = currentX;
+          initialY = currentY;
+
+          isDragging = false;
+        }
+
+        function setTranslate(xPos, yPos, el) {
+          el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
+        }
+
+        contextMenuHeader.addEventListener('selectstart', (e) => {
+          if (isDragging) {
+            e.preventDefault();
+          }
+        });
+      }
+    });
+
+    document.getElementById('edit-status-btn').addEventListener('click', () => {
+      const statusImageContainer = document.querySelector('.status-image-container');
+      statusImageContainer.classList.add('editing');
+    });
+
+    document.getElementById('save-status-btn').addEventListener('click', () => {
+      const statusImageContainer = document.querySelector('.status-image-container');
+      statusImageContainer.classList.remove('editing');
+    });
+  </script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const unitList = document.getElementById('unit-list');
+      const unitListPanel = document.getElementById('unit-list-panel');
+      let draggedItem = null;
+
+      unitList.addEventListener('dragstart', (e) => {
+        if (e.target.classList.contains('unit-list-item')) {
+          draggedItem = e.target;
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', ''); // Required for Firefox
+          setTimeout(() => {
+            e.target.classList.add('dragging');
+          }, 0);
+        }
+      });
+
+      unitList.addEventListener('dragend', (e) => {
+        if (draggedItem) {
+          draggedItem.classList.remove('dragging');
+          draggedItem = null;
+        }
+      });
+
+      unitList.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+
+        const afterElement = getDragAfterElement(unitList, e.clientY);
+        if (afterElement == null) {
+          unitList.appendChild(draggedItem);
+        } else {
+          unitList.insertBefore(draggedItem, afterElement);
+        }
+      });
+
+      function getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('.unit-list-item:not(.dragging)')];
+
+        return draggableElements.reduce((closest, child) => {
+          const box = child.getBoundingClientRect();
+          const offset = y - box.top - box.height / 2;
+
+          if (offset < 0 && offset > closest.offset) {
+            return {
+              offset: offset,
+              element: child
+            };
+          } else {
+            return closest;
+          }
+        }, {
+          offset: Number.NEGATIVE_INFINITY
+        }).element;
+      }
+
+      document.addEventListener('click', (event) => {
+        if (!unitListPanel.contains(event.target) && !document.getElementById('unit-list-toggle').contains(event.target) && unitListPanel.classList.contains('visible')) {
+          unitListPanel.classList.remove('visible');
+        }
+      });
+    });
+  </script>
+  <script>
+    function generateUnitListItem(unitId, status, key) {
+      const li = document.createElement('li');
+      li.className = 'unit-list-item';
+      li.draggable = true;
+
+      li.innerHTML = `
+        <span class="unit-id">${unitId}</span>
+        <span class="unit-list-status status-text status-${status}">${status.toUpperCase()}</span>
+        <button class="delete-unit-btn" data-key="${key}">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      `;
+
+      li.addEventListener('click', (e) => {
+        e.preventDefault();
+      });
+
+      return li;
+    }
+  </script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const toggleDeleteButtons = document.getElementById('toggle-delete-buttons');
+      const unitList = document.getElementById('unit-list');
+
+      let deleteButtonsVisible = false;
+      hideDeleteButtons();
+
+      toggleDeleteButtons.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        deleteButtonsVisible = !deleteButtonsVisible;
+        if (deleteButtonsVisible) {
+          showDeleteButtons();
+        } else {
+          hideDeleteButtons();
+        }
+      });
+
+      function showDeleteButtons() {
+        const deleteButtons = unitList.querySelectorAll('.delete-unit-btn, .delete-building-btn');
+        deleteButtons.forEach(button => {
+          button.style.display = 'inline-flex';
+        });
+      }
+
+      function hideDeleteButtons() {
+        const deleteButtons = unitList.querySelectorAll('.delete-unit-btn, .delete-building-btn');
+        deleteButtons.forEach(button => {
+          button.style.display = 'none';
+        });
+      }
+
+      const toggleBuildingSectionButton = document.getElementById('toggle-building-section');
+      const buildingContainer = document.getElementById('building-container');
+
+      toggleBuildingSectionButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        buildingContainer.classList.toggle('collapsed');
+      });
+    });
+  </script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const buildingContainer = document.getElementById('building-container');
+      buildingContainer.classList.add('collapsed');
+    });
+  </script>
+  
+  <script>
+    // PIN Protection System
+    document.addEventListener('DOMContentLoaded', () => {
+      const correctPin = '1962';
+      let currentPin = '';
+      const pinOverlay = document.getElementById('pin-overlay');
+      const pinContainer = document.getElementById('pin-container');
+      const pinDigits = document.querySelectorAll('.pin-digit');
+      const pinKeys = document.querySelectorAll('.pin-key');
+
+      // Check if already authenticated
+      if (!sessionStorage.getItem('pinAuthenticated')) {
+        pinOverlay.style.display = 'flex';
+      } else {
+        pinOverlay.style.display = 'none';
+      }
+
+      function updatePinDisplay() {
+        pinDigits.forEach((digit, index) => {
+          if (index < currentPin.length) {
+            digit.classList.add('filled');
+          } else {
+            digit.classList.remove('filled');
+          }
+        });
+      }
+
+      function checkPin() {
+        if (currentPin === correctPin) {
+          sessionStorage.setItem('pinAuthenticated', 'true');
+          pinOverlay.classList.add('hidden');
+          setTimeout(() => {
+            pinOverlay.style.display = 'none';
+          }, 500);
+        } else {
+          currentPin = '';
+          updatePinDisplay();
+          pinContainer.classList.add('invalid');
+          setTimeout(() => {
+            pinContainer.classList.remove('invalid');
+          }, 500);
+        }
+      }
+
+      pinKeys.forEach(key => {
+        key.addEventListener('click', () => {
+          const value = key.textContent;
+          
+          if (value === '←') {
+            currentPin = currentPin.slice(0, -1);
+          } else if (value === '✓') {
+            checkPin();
+          } else if (currentPin.length < 4) {
+            currentPin += value;
+          }
+          
+          updatePinDisplay();
+        });
+      });
+
+      // Add keyboard support
+      document.addEventListener('keydown', (e) => {
+        if (pinOverlay.style.display !== 'none') {
+          if (e.key >= '0' && e.key <= '9' && currentPin.length < 4) {
+            currentPin += e.key;
+            updatePinDisplay();
+          } else if (e.key === 'Backspace') {
+            currentPin = currentPin.slice(0, -1);
+            updatePinDisplay();
+          } else if (e.key === 'Enter') {
+            checkPin();
+          }
+        }
+      });
+    });
+  </script>
 </body>
+
 </html>

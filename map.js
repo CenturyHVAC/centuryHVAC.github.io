@@ -1,10 +1,6 @@
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
-import { getDatabase, ref, onValue, set, remove } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js';
-
-// Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyDXWogbfI_heWojtSOP9A-dnMVTm9R9ad4",
-  authDomain: "centuryhvac-7a45d.firebaseapp.com", 
+  authDomain: "centuryhvac-7a45d.firebaseapp.com",
   databaseURL: "https://centuryhvac-7a45d-default-rtdb.firebaseio.com",
   projectId: "centuryhvac-7a45d",
   storageBucket: "centuryhvac-7a45d.firebasestorage.app",
@@ -13,245 +9,25 @@ const firebaseConfig = {
   measurementId: "G-ZPFFWN1PP4"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-
-// Single map instance reference
-let map = null;
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+const markersRef = database.ref('markers');
+const buildingsRef = database.ref('buildings');
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Check if user is authenticated
-  if (!sessionStorage.getItem('pinAuthenticated')) {
-    document.getElementById('pin-modal').style.display = 'block';
-    document.getElementById('map-container').style.display = 'none';
-    return; // Don't initialize map until authenticated
-  }
+  console.log('DOMContentLoaded event fired');
 
-  // Show map container
-  document.getElementById('map-container').style.display = 'block';
+  const unitListToggle = document.getElementById('unit-list-toggle');
+  const unitListPanel = document.getElementById('unit-list-panel');
+  const unitList = document.getElementById('unit-list');
+  const unitCount = document.getElementById('unit-count');
   
-  // Initialize map if not already initialized
-  if (!map) {
-    // Clean up any existing map instance
-    const mapElement = document.getElementById('map');
-    if (mapElement._leaflet_id) {
-      mapElement._leaflet_id = null;
-    }
-    
-    setTimeout(() => {
-      initializeMap();
-    }, 100); // Small delay to ensure DOM is fully ready
-  }
-});
-
-// Pin authentication
-document.getElementById('pin-form').addEventListener('submit', (e) => {
-  e.preventDefault();
-  const enteredPin = document.getElementById('pin-input').value;
-  if (enteredPin === '1962') {
-    sessionStorage.setItem('pinAuthenticated', 'true');
-    document.getElementById('pin-modal').style.display = 'none';
-    document.getElementById('map-container').style.display = 'block';
-    document.getElementById('pin-error').style.display = 'none';
-    
-    // Initialize map after authentication if not already initialized
-    if (!map) {
-      setTimeout(() => {
-        initializeMap();
-      }, 100); // Small delay to ensure DOM is fully ready
-    }
-  } else {
-    document.getElementById('pin-error').style.display = 'block';
-    document.getElementById('pin-input').value = ''; // Clear input
-  }
-});
-
-function initializeMap() {
-  // If map already exists, return early
-  if (map) {
-    console.log('Map already initialized');
-    return;
-  }
-
-  // Remove previous map if it exists
-  const existingMap = document.getElementById('map');
-  if (existingMap._leaflet_map) {
-    existingMap._leaflet_map.remove();
-  }
-
-  let markersById = new Map(); // Track markers by their IDs
-
-  // Define custom icons
-  const greenIcon = L.icon({
-    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41]
+  unitListToggle.addEventListener('click', () => {
+    unitListPanel.classList.toggle('visible');
   });
-
-  const redIcon = L.icon({
-    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41]
-  });
-
-  const yellowIcon = L.icon({
-    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-yellow.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41]
-  });
-
-  // Function to set marker icon based on status
-  function setMarkerIcon(marker) {
-    if (marker.markerData) {
-      if (marker.markerData.status === 'down') {
-        marker.setIcon(redIcon);
-      } else if (marker.markerData.status === 'limited') {
-        marker.setIcon(yellowIcon);
-      } else if (marker.markerData.status === 'up') {
-        marker.setIcon(greenIcon);
-      } else {
-        marker.setIcon(greenIcon); // Default to green for unknown status
-      }
-    }
-  }
-
-  // Function to load saved map progress
-  function loadMapProgress() {
-    // Set up Firebase listener for markers
-    const markersRef = ref(db, 'markers');
-    onValue(markersRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        // Clear existing markers
-        map.eachLayer((layer) => {
-          if (layer instanceof L.Marker) {
-            map.removeLayer(layer);
-          }
-        });
-        markersById.clear(); // Clear the markers tracking Map
-
-        // Add markers from Firebase
-        data.forEach(markerData => {
-          // Ensure marker data has all required properties
-          if (!markerData.markerData.history) {
-            markerData.markerData.history = {
-              status: [],
-              parts: []
-            };
-          }
-          if (!markerData.markerData.history.parts) {
-            markerData.markerData.history.parts = [];
-          }
-          if (!markerData.markerData.history.status) {
-            markerData.markerData.history.status = [];
-          }
-          if (!markerData.markerData.parts) {
-            markerData.markerData.parts = [];
-          }
-
-          const marker = L.marker(markerData.latlng, {
-            draggable: false
-          }).addTo(map)
-          .on('click', function(markerEvent) {
-            markerEvent.originalEvent.stopPropagation();
-            if (!this.markerData) {
-              this.markerData = {
-                unitId: markerData.markerData.unitId,
-                status: markerData.markerData.status,
-                notes: markerData.markerData.notes,
-                details: markerData.markerData.details || {},
-                parts: markerData.markerData.parts || [],
-                history: {
-                  status: markerData.markerData.history.status || [],
-                  parts: markerData.markerData.history.parts || []
-                }
-              };
-            }
-            currentMarker = this;
-            showContextMenu(markerEvent);
-          });
-
-          marker.markerData = markerData.markerData;
-          setMarkerIcon(marker);
-          
-          // Store marker reference
-          if (marker.markerData && marker.markerData.unitId) {
-            markersById.set(marker.markerData.unitId, marker);
-          }
-        });
-
-        // Update marker list
-        updateMarkerList();
-      }
-    });
-
-    // Load local view state
-    const savedProgress = localStorage.getItem('mapProgress');
-    if (savedProgress) {
-      const mapState = JSON.parse(savedProgress);
-      map.setView(mapState.center, mapState.zoom);
-      map.setBearing(mapState.bearing);
-
-      // Restore rotation slider
-      const rotationSlider = document.getElementById('rotation-slider');
-      const rotationDisplay = document.getElementById('rotation-display');
-      rotationSlider.value = mapState.bearing;
-      rotationDisplay.textContent = `${mapState.bearing}°`;
-    }
-  }
-
-  // Modify saveMapProgress to sync with Firebase
-  function saveMapProgress() {
-    if (map) {
-      const markers = [];
-      map.eachLayer((layer) => {
-        if (layer instanceof L.Marker) {
-          markers.push({
-            latlng: layer.getLatLng(),
-            markerData: layer.markerData
-          });
-        }
-      });
-
-      // Save view state to localStorage only
-      const mapState = {
-        center: map.getCenter(),
-        zoom: map.getZoom(),
-        bearing: map.getBearing()
-      };
-      localStorage.setItem('mapProgress', JSON.stringify(mapState));
-
-      // Save markers to Firebase
-      set(ref(db, 'markers'), markers);
-    }
-  }
-
-  // Modify marker deletion to sync with Firebase
-  function deleteMarker(marker) {
-    if (marker && marker.markerData && marker.markerData.unitId) {
-      // Remove from map
-      map.removeLayer(marker);
-      
-      // Remove from markersById
-      markersById.delete(marker.markerData.unitId);
-      
-      // Save state to sync deletion
-      saveMapProgress();
-    }
-  }
-
+ 
   const latitude = 35.31062486972806;
-  const longitude = -81.84777052479605;
+  const longitude = -81.84743842537509 ;
 
   // Calculate bounds (approximately 1000 feet in all directions)
   // 1 degree of latitude = ~364,000 feet
@@ -267,8 +43,8 @@ function initializeMap() {
     [latitude + latOffset, longitude + lngOffset]  // Northeast corner
   );
 
-  // Initialize the map
-  map = L.map('map', {
+  // Create map with rotation plugin and set specific zoom and center
+  const map = L.map('map', {
     center: [latitude, longitude],
     zoom: 19,
     minZoom: 18,
@@ -280,14 +56,160 @@ function initializeMap() {
     zoomSnap: 0.25,
     zoomDelta: 0.25,
     maxBounds: bounds,
-    maxBoundsViscosity: 1.0,
-    inertia: false
+    maxBoundsViscosity: 1.0,  // Make the bounds absolutely solid
+    inertia: false  // Disable map inertia to prevent overshooting bounds
   });
 
   // Set initial bearing to 163 degrees
   map.setBearing(163);
 
+  let markersMap = new Map(); // Store markers with their Firebase keys
+  let rightClickPos = null; // Store position of right click
+  let draggedItem = null; // Store the item being dragged
+  let isListLocked = true; // List is locked by default
+
+  // Create right-click context menu
+  const mapContextMenu = document.createElement('div');
+  mapContextMenu.id = 'map-context-menu';
+  mapContextMenu.className = 'map-context-menu hidden';
+  mapContextMenu.innerHTML = `
+    <ul>
+      <li id="add-unit-option">Add Unit Marker</li>
+    </ul>
+  `;
+  document.body.appendChild(mapContextMenu);
+
+  // Hide map context menu when clicking elsewhere
+  document.addEventListener('click', (e) => {
+    if (!mapContextMenu.contains(e.target)) {
+      mapContextMenu.classList.add('hidden');
+    }
+  });
+
+  // Show map context menu on right click
+  map.on('contextmenu', function(e) {
+    e.originalEvent.preventDefault();
+    rightClickPos = e.latlng;
+    
+    mapContextMenu.style.left = e.originalEvent.pageX + 'px';
+    mapContextMenu.style.top = e.originalEvent.pageY + 'px';
+    mapContextMenu.classList.remove('hidden');
+  });
+
+  // Handle "Add Unit Marker" option
+  document.getElementById('add-unit-option').addEventListener('click', () => {
+    if (rightClickPos) {
+      // Create marker data with complete structure
+      const markerData = {
+        latlng: rightClickPos,
+        markerData: {
+          unitId: 'UNIT-ID',
+          status: 'up',
+          notes: '',
+          statusImageUrl: '',
+          details: {
+            brand: '',
+            model: '',
+            serial: '',
+            mfgDate: '',
+            freonType: ''
+          },
+          parts: [],
+          history: {
+            status: [],
+            parts: []
+          }
+        }
+      };
+
+      // Push to Firebase and let the child_added listener handle marker creation
+      markersRef.push(markerData).then(newMarkerRef => {
+        const newMarkerKey = newMarkerRef.key;
+        
+        // Wait briefly for marker to be created and added to map
+        setTimeout(() => {
+          const newMarker = markersMap.get(newMarkerKey);
+          if (newMarker) {
+            currentMarker = newMarker;
+            
+            // Bind click event explicitly
+            newMarker.on('click', function(e) {
+              e.originalEvent.stopPropagation();
+              currentMarker = this;
+              showContextMenu({
+                containerPoint: map.latLngToContainerPoint(newMarker.getLatLng())
+              });
+            });
+            
+            // Calculate position for context menu
+            const containerPoint = map.latLngToContainerPoint(newMarker.getLatLng());
+            
+            // Show context menu
+            showContextMenu({
+              containerPoint: containerPoint
+            });
+          }
+        }, 500);
+      });
+
+      mapContextMenu.classList.add('hidden');
+      rightClickPos = null;
+    }
+  });
+
+  // Close context menu when clicking outside
+  const contextMenu = document.getElementById('context-menu');
+  let currentMarker = null;
+  let isAddingMarker = false;
+
+  document.addEventListener('click', (e) => {
+    const mapContextMenu = document.getElementById('map-context-menu');
+    
+    // Check if the click is outside both context menus
+    if (contextMenu && !contextMenu.contains(e.target) && 
+        mapContextMenu && !mapContextMenu.contains(e.target)) {
+      
+      // Only hide if the click was not on a marker
+      const clickedOnMarker = Array.from(markersMap.values()).some(marker => 
+        marker.getElement() && marker.getElement().contains(e.target)
+      );
+      
+      if (!clickedOnMarker) {
+        contextMenu.classList.add('hidden');
+        currentMarker = null;
+      }
+    }
+  });
+
+  // Prevent context menu from propagating clicks
+  if (contextMenu) {
+    contextMenu.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+  }
+
   // Load saved progress after map initialization
+  function loadMapProgress() {
+    const savedProgress = localStorage.getItem('mapViewState');
+    
+    // Always start at the hardcoded center and zoom
+    map.setView([latitude, longitude], 19);
+    map.setBearing(163);
+
+    // Update rotation slider to match
+    const rotationSlider = document.getElementById('rotation-slider');
+    const rotationDisplay = document.getElementById('rotation-display');
+    if (rotationSlider && rotationDisplay) {
+      rotationSlider.value = 163;
+      rotationDisplay.textContent = '163°';
+    }
+
+    // If there's saved progress, you might want to log it or use parts of it later
+    if (savedProgress) {
+      console.log('Saved map progress exists, but using hardcoded center and zoom');
+    }
+  }
+
   loadMapProgress();
 
   // Add the satellite tile layer after loading saved progress
@@ -334,37 +256,6 @@ function initializeMap() {
     }
   });
 
-  let currentMarker = null;
-  let isAddingMarker = false;
-  const addMarkerButton = document.getElementById('add-marker-button');
-
-  addMarkerButton.addEventListener('click', () => {
-    if (!isAddingMarker) {
-      // Enter "adding marker" mode
-      isAddingMarker = true;
-      addMarkerButton.classList.add('active');
-      addMarkerButton.textContent = 'Click Map to Add Unit';
-
-      // Temporary event listener for map click
-      function onMapClick(e) {
-        // Open the multiple markers modal at the clicked location
-        rightClickPoint = e.latlng;
-        openMultipleMarkersModal();
-        
-        // Remove this temporary event listener
-        map.off('click', onMapClick);
-        
-        // Reset button state
-        isAddingMarker = false;
-        addMarkerButton.classList.remove('active');
-        addMarkerButton.textContent = 'Add Unit';
-      }
-
-      // Add the one-time map click listener
-      map.on('click', onMapClick);
-    }
-  });
-
   // Tab switching functionality
   const tabButtons = document.querySelectorAll('.tab');
   const tabPanels = document.querySelectorAll('.tab-panel');
@@ -393,104 +284,71 @@ function initializeMap() {
   const statusHistoryContainer = document.getElementById('status-history');
   const contextMenuHeader = document.getElementById('context-menu-header');
 
-  editStatusBtn.addEventListener('click', () => {
-    statusEditSection.classList.remove('hidden');
-  });
+  if (editStatusBtn) {
+    editStatusBtn.addEventListener('click', () => {
+      if (statusEditSection) {
+        statusEditSection.classList.remove('hidden');
+      }
+    });
+  }
 
-  saveStatusBtn.addEventListener('click', () => {
-    if (currentMarker && currentMarker.markerData) {
-      const newStatus = unitStatusSelect.value;
-      const newNotes = statusNotesTextarea.value;
+  if (saveStatusBtn) {
+    saveStatusBtn.addEventListener('click', () => {
+      if (!currentMarker) return;
 
-      // Update marker data
-      currentMarker.markerData.status = newStatus;
-      currentMarker.markerData.notes = newNotes;
+      const markerData = safeGetMarkerData(currentMarker);
+      const newStatus = unitStatusSelect?.value || 'up';
+      const newNotes = statusNotesTextarea?.value || '';
+      const newImageUrl = document.getElementById('status-image-url')?.value?.trim() || markerData.statusImageUrl;
 
-      // Update marker icon based on status
+      // Update marker data with null checks
+      currentMarker.markerData = {
+        ...markerData,
+        status: newStatus,
+        notes: newNotes,
+        statusImageUrl: newImageUrl
+      };
+
+      // Update UI elements with null checks
       setMarkerIcon(currentMarker);
+      
+      if (currentStatusDisplay) {
+        currentStatusDisplay.textContent = newStatus.toUpperCase();
+        currentStatusDisplay.className = `status-text status-${newStatus}`;
+      }
 
-      // Update status display
-      currentStatusDisplay.textContent = newStatus.toUpperCase();
-      currentStatusDisplay.className = `status-text status-${newStatus}`;
-
-      // Update latest notes display
       const latestNotesDisplay = document.getElementById('latest-notes-display');
-      latestNotesDisplay.textContent = newNotes ? `Notes: ${newNotes}` : '';
-      latestNotesDisplay.classList.toggle('has-notes', !!newNotes);
+      if (latestNotesDisplay) {
+        latestNotesDisplay.textContent = newNotes ? `Notes: ${newNotes}` : '';
+        latestNotesDisplay.classList.toggle('has-notes', !!newNotes);
+      }
 
-      // Add to history
-      const now = new Date();
+      const statusImage = document.querySelector('.status-image');
+      if (statusImage) {
+        statusImage.src = newImageUrl || 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTN3lFE1mgBbxtpLcZeDQVMNl-JX0w5cI6pzQ&s';
+      }
+
+      // Add to history with null checks
+      if (!currentMarker.markerData.history) {
+        currentMarker.markerData.history = { status: [], parts: [] };
+      }
+
       const historyEntry = {
-        date: now,
+        date: new Date().toISOString(),
         status: newStatus,
         notes: newNotes
       };
+
       currentMarker.markerData.history.status.unshift(historyEntry);
 
-      // Update history display
-      updateStatusHistory(statusHistoryContainer, currentMarker);
-
-      // Hide edit section
-      statusEditSection.classList.add('hidden');
-      saveMapProgress(); // Save state after updating status
-    }
-  });
-
-  const contextMenu = document.getElementById('context-menu');
-  const mapContextMenu = document.getElementById('map-context-menu');
-  const addUnitMarkerBtn = document.getElementById('add-unit-marker-btn');
-  let rightClickPoint = null;
-
-  map.on('contextmenu', function(e) {
-    // Prevent the default browser context menu
-    e.originalEvent.preventDefault();
-    
-    // Store the clicked point
-    rightClickPoint = e.latlng;
-    
-    // Position the context menu at the click point
-    const x = e.containerPoint.x;
-    const y = e.containerPoint.y;
-    
-    // Get viewport dimensions
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    
-    // Get menu dimensions
-    const menuWidth = 150; // Approximate width of the context menu
-    const menuHeight = 35; // Approximate height of the context menu
-    
-    // Adjust position if menu would go off screen
-    let left = x;
-    let top = y;
-    
-    if (left + menuWidth > viewportWidth) {
-      left = viewportWidth - menuWidth - 5;
-    }
-    
-    if (top + menuHeight > viewportHeight) {
-      top = viewportHeight - menuHeight - 5;
-    }
-    
-    // Show the context menu at the adjusted position
-    mapContextMenu.style.left = left + 'px';
-    mapContextMenu.style.top = top + 'px';
-    mapContextMenu.classList.remove('hidden');
-  });
-
-  // Hide the map context menu when clicking anywhere else
-  map.on('click', function() {
-    mapContextMenu.classList.add('hidden');
-    rightClickPoint = null;
-  });
-
-  // Add unit marker when clicking the menu item
-  addUnitMarkerBtn.addEventListener('click', function(e) {
-    e.stopPropagation(); // Prevent the click from bubbling up
-    if (rightClickPoint) {
-      openMultipleMarkersModal();
-    }
-  });
+      // Update displays and sync
+      updateStatusHistory();
+      if (statusEditSection) {
+        statusEditSection.classList.add('hidden');
+      }
+      syncMarkerToFirebase(currentMarker);
+    });
+  }
 
   // Parts functionality
   const partNameInput = document.getElementById('part-name');
@@ -511,7 +369,7 @@ function initializeMap() {
     saveNewPartBtn.textContent = 'Save Part'; // Ensure button text is correct
   });
 
-  // Add part functionality
+  // Modify the save buttons to properly handle dates
   saveNewPartBtn.addEventListener('click', () => {
     const partName = partNameInput.value.trim();
     const partNumber = partNumberInput.value.trim();
@@ -534,12 +392,12 @@ function initializeMap() {
           name: partName,
           number: partNumber,
           replacementDate: replacementDate,
-          addedDate: now
+          addedDate: now.toISOString() // Convert Date to ISO string
         };
         
         currentMarker.markerData.parts.push(newPart);
         currentMarker.markerData.history.parts.unshift({
-          date: now,
+          date: now.toISOString(), // Convert Date to ISO string
           action: 'added',
           part: newPart
         });
@@ -551,9 +409,9 @@ function initializeMap() {
       partReplacementDateInput.value = '';
       addPartsInput.classList.add('hidden');
       showAddPartsBtn.classList.remove('hidden');
-      populatePartsList(partsList, currentMarker, editingPartIndex, partNameInput, partNumberInput, partReplacementDateInput, addPartsInput, showAddPartsBtn, saveNewPartBtn);
-      updatePartsHistory(partsHistoryContainer, currentMarker);
-      saveMapProgress(); // Save state after updating parts
+      populatePartsList();
+      updatePartsHistory();
+      syncMarkerToFirebase(currentMarker); // Save state after updating parts
     }
   });
 
@@ -622,20 +480,22 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
       // Hide editable grid, show details display
       detailsGrid.style.display = 'none';
       detailsDisplay.style.display = 'block';
-      saveMapProgress(); // Save state after updating details
+      syncMarkerToFirebase(currentMarker); // Save state after updating details
     }
   });
 
-  function populatePartsList(partsList, currentMarker, editingPartIndex, partNameInput, partNumberInput, partReplacementDateInput, addPartsInput, showAddPartsBtn, saveNewPartBtn) {
+  function populatePartsList() {
     partsList.innerHTML = ''; // Clear existing parts
-    if (currentMarker && currentMarker.markerData && currentMarker.markerData.parts) {
+    if (currentMarker?.markerData?.parts) {
       currentMarker.markerData.parts.forEach((part, index) => {
+        if (!part) return; // Skip if part is undefined
+      
         const partEntry = document.createElement('li');
         partEntry.classList.add('part-entry');
         partEntry.innerHTML = `
           <div>
-            <span class="part-name">${part.name}</span>
-            <span class="part-number">(${part.number})</span>
+            <span class="part-name">${part.name || ''}</span>
+            <span class="part-number">(${part.number || ''})</span>
             ${part.replacementDate ? `<span class="part-replacement-date">Replaced: ${part.replacementDate}</span>` : ''}
           </div>
           <div class="part-actions">
@@ -645,959 +505,957 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
         `;
         partsList.appendChild(partEntry);
 
-        // Add event listener for delete button
-        const deleteButton = partEntry.querySelector('.delete-part-btn');
-        deleteButton.addEventListener('click', () => {
-          const partIndex = parseInt(deleteButton.dataset.partIndex, 10);
-          if (partIndex !== undefined && partIndex >= 0 && partIndex < currentMarker.markerData.parts.length) {
-            // Add to history before removing
-            const now = new Date();
-            currentMarker.markerData.history.parts.unshift({
-              date: now,
-              action: 'deleted',
-              part: currentMarker.markerData.parts[partIndex]
-            });
+        // Add event listeners with error handling
+        try {
+          const deleteButton = partEntry.querySelector('.delete-part-btn');
+          deleteButton.addEventListener('click', () => {
+            const partIndex = parseInt(deleteButton.dataset.partIndex, 10);
+            if (!isNaN(partIndex) && partIndex >= 0 && partIndex < currentMarker.markerData.parts.length) {
+              currentMarker.markerData.parts.splice(partIndex, 1);
+              populatePartsList();
+              syncMarkerToFirebase(currentMarker);
+            }
+          });
 
-            currentMarker.markerData.parts.splice(partIndex, 1); // Remove part from array
-            populatePartsList(partsList, currentMarker, editingPartIndex, partNameInput, partNumberInput, partReplacementDateInput, addPartsInput, showAddPartsBtn, saveNewPartBtn);
-            updatePartsHistory(partsHistoryContainer, currentMarker);
-            saveMapProgress(); // Save state after deleting part
-          }
-        });
-
-        // Add event listener for edit button
-        const editButton = partEntry.querySelector('.edit-part-btn');
-        editButton.addEventListener('click', () => {
-          const partToEdit = currentMarker.markerData.parts[index];
-          partNameInput.value = partToEdit.name;
-          partNumberInput.value = partToEdit.number;
-          partReplacementDateInput.value = partToEdit.replacementDate || ''; // Handle cases where replacementDate might be undefined
-          addPartsInput.classList.remove('hidden');
-          showAddPartsBtn.classList.add('hidden');
-          editingPartIndex = index; // Set the index being edited
-          saveNewPartBtn.textContent = 'Update Part'; // Change button text to indicate edit mode
-
-          // When editing, remove the current part entry so it can be replaced
-          currentMarker.markerData.parts.splice(index, 1);
-        });
+          const editButton = partEntry.querySelector('.edit-part-btn');
+          editButton.addEventListener('click', () => {
+            const partIndex = parseInt(editButton.dataset.partIndex, 10);
+            if (!isNaN(partIndex) && partIndex >= 0 && partIndex < currentMarker.markerData.parts.length) {
+              const partToEdit = currentMarker.markerData.parts[partIndex];
+              partNameInput.value = partToEdit.name || '';
+              partNumberInput.value = partToEdit.number || '';
+              partReplacementDateInput.value = partToEdit.replacementDate || '';
+              addPartsInput.classList.remove('hidden');
+              showAddPartsBtn.classList.add('hidden');
+              editingPartIndex = partIndex;
+              saveNewPartBtn.textContent = 'Update Part';
+            }
+          });
+        } catch (error) {
+          console.error('Error setting up part buttons:', error);
+        }
       });
     }
   }
 
-  // Update the existing save part functionality
-  saveNewPartBtn.addEventListener('click', () => {
-    const partName = partNameInput.value.trim();
-    const partNumber = partNumberInput.value.trim();
-    const replacementDate = partReplacementDateInput.value;
+  function populateDetailsTab() {
+    try {
+      if (currentMarker?.markerData) {
+        // Initialize details object if it doesn't exist
+        if (!currentMarker.markerData.details) {
+          currentMarker.markerData.details = {
+            brand: '',
+            model: '',
+            serial: '',
+            mfgDate: '',
+            freonType: ''
+          };
+        }
 
-    if (partName && partNumber && currentMarker && currentMarker.markerData) {
-      const now = new Date();
+        const details = currentMarker.markerData.details;
+        unitBrandInput.value = details.brand || '';
+        unitModelInput.value = details.model || '';
+        unitSerialInput.value = details.serial || '';
+        unitMfgDateInput.value = details.mfgDate || '';
+        unitFreonTypeSelect.value = details.freonType || '';
 
-      if (!currentMarker.markerData.parts) {
-        currentMarker.markerData.parts = [];
+        // Populate status image URL in edit field
+        const statusImageUrlInput = document.getElementById('status-image-url');
+        const statusImage = document.querySelector('.status-image');
+        
+        if (statusImageUrlInput) {
+          statusImageUrlInput.value = currentMarker.markerData.statusImageUrl || '';
+        }
+
+        if (statusImage) {
+          statusImage.src = currentMarker.markerData.statusImageUrl || 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTN3lFE1mgBbxtpLcZeDQVMNl-JX0w5cI6pzQ&s';
+        }
+
+        const formattedDetails = `
+UNIT DETAILS:
+Brand:        ${details.brand || 'N/A'}
+Model:        ${details.model || 'N/A'}
+Serial:       ${details.serial || 'N/A'}
+Mfg Date:     ${details.mfgDate || 'N/A'}
+Freon Type:   ${details.freonType || 'N/A'}`.trim();
+
+        detailsDisplay.textContent = formattedDetails;
+      } else {
+        // Reset inputs and display if no details exist
+        unitBrandInput.value = '';
+        unitModelInput.value = '';
+        unitSerialInput.value = '';
+        unitMfgDateInput.value = '';
+        unitFreonTypeSelect.value = '';
+        detailsDisplay.textContent = 'No details available';
       }
 
-      if (!currentMarker.markerData.history) {
-        currentMarker.markerData.history = { status: [], parts: [] };
-      }
+      // Ensure inputs are disabled by default
+      unitBrandInput.disabled = true;
+      unitModelInput.disabled = true;
+      unitSerialInput.disabled = true;
+      unitMfgDateInput.disabled = true;
+      unitFreonTypeSelect.disabled = true;
 
-      const newPart = {
-        name: partName,
-        number: partNumber,
-        replacementDate: replacementDate,
-        addedDate: now
-      };
-      
-      currentMarker.markerData.parts.push(newPart);
-      currentMarker.markerData.history.parts.unshift({
-        date: now,
-        action: editingPartIndex !== -1 ? 'updated' : 'added',
-        part: newPart
-      });
+      // Reset button states and visibility
+      editDetailsBtn.style.display = 'inline-block';
+      saveDetailsBtn.style.display = 'none';
 
-      // Reset inputs and UI
-      partNameInput.value = '';
-      partNumberInput.value = '';
-      partReplacementDateInput.value = '';
-      addPartsInput.classList.add('hidden');
-      showAddPartsBtn.classList.remove('hidden');
-      
-      populatePartsList(partsList, currentMarker, editingPartIndex, partNameInput, partNumberInput, partReplacementDateInput, addPartsInput, showAddPartsBtn, saveNewPartBtn);
-      updatePartsHistory(partsHistoryContainer, currentMarker);
-      saveMapProgress();
-    }
-  });
-
-  function updateStatusHistory(container, marker) {
-    if (marker && marker.markerData && marker.markerData.history) {
-      container.innerHTML = '';
-      marker.markerData.history.status.forEach(entry => {
-        const historyEntry = document.createElement('div');
-        historyEntry.classList.add('history-entry');
-        
-        const date = new Date(entry.date);
-        const formattedDate = date.toLocaleString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
-
-        historyEntry.innerHTML = `
-          <span class="history-date">${formattedDate}</span>
-          <span class="history-status status-text status-${entry.status}">${entry.status.toUpperCase()}</span>
-          ${entry.notes ? `<span class="history-notes">"${entry.notes}"</span>` : ''}
-        `;
-        
-        container.appendChild(historyEntry);
-      });
-    }
-  }
-
-  function updatePartsHistory(container, marker) {
-    if (marker && marker.markerData && marker.markerData.history) {
-      container.innerHTML = '';
-      marker.markerData.history.parts.forEach(entry => {
-        const historyEntry = document.createElement('div');
-        historyEntry.classList.add('history-entry');
-        
-        const date = new Date(entry.date);
-        const formattedDate = date.toLocaleString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
-
-        historyEntry.innerHTML = `
-          <span class="history-date">${formattedDate}</span>
-          <span class="history-part">${entry.part.name} (${entry.part.number})</span>
-          ${entry.part.replacementDate ? `<span class="history-replacement-date">Replaced: ${entry.part.replacementDate}</span>` : ''}
-        `;
-        
-        container.appendChild(historyEntry);
-      });
+      // Hide editable grid, show details display
+      detailsGrid.style.display = 'none';
+      detailsDisplay.style.display = 'block';
+    } catch (error) {
+      console.error('Error in populateDetailsTab:', error);
     }
   }
 
   function showContextMenu(event) {
-    if (currentMarker && currentMarker.markerData) {
-      // Create a new context menu for this marker
-      const newContextMenu = document.getElementById('context-menu').cloneNode(true);
-      newContextMenu.id = `context-menu-${currentMarker.markerData.unitId}`;
-      newContextMenu.classList.remove('hidden');
-      document.body.appendChild(newContextMenu);
-
-      // Get viewport dimensions
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-
-      // Get context menu dimensions
-      const menuWidth = 400; // Width defined in CSS
-      const menuHeight = Math.min(newContextMenu.scrollHeight, window.innerHeight * 0.8); // 80% of viewport height max
-
-      // Calculate initial position
-      let left = event.containerPoint.x;
-      let top = event.containerPoint.y;
-
-      // Adjust horizontal position if menu would overflow right edge
-      if (left + menuWidth > viewportWidth) {
-        left = viewportWidth - menuWidth - 10; // 10px padding from edge
-      }
-      // Ensure menu doesn't overflow left edge
-      left = Math.max(10, left);
-
-      // Adjust vertical position if menu would overflow bottom edge
-      if (top + menuHeight > viewportHeight) {
-        top = viewportHeight - menuHeight - 10; // 10px padding from edge
-      }
-      // Ensure menu doesn't overflow top edge
-      top = Math.max(10, top);
-
-      // Position the menu
-      newContextMenu.style.left = `${left}px`;
-      newContextMenu.style.top = `${top}px`;
-
-      // Make the menu draggable
-      makeDraggable(newContextMenu);
-
-      // Set up close button
-      const closeBtn = newContextMenu.querySelector('.close-btn');
-      closeBtn.addEventListener('click', () => {
-        newContextMenu.remove();
-      });
-
-      // Set up the header with unit ID and buttons
-      const unitIdDisplay = newContextMenu.querySelector('#unit-id-display');
-      unitIdDisplay.textContent = currentMarker.markerData.unitId;
-
-      // Set up edit button
-      const editBtn = newContextMenu.querySelector('.edit-unit-id-btn');
-      editBtn.addEventListener('click', () => {
-        const newUnitId = prompt("Enter new UNIT-ID:", currentMarker.markerData.unitId);
-        if (newUnitId !== null && newUnitId.trim() !== '') {
-          currentMarker.markerData.unitId = newUnitId.trim();
-          unitIdDisplay.textContent = newUnitId.trim();
-          saveMapProgress();
-        }
-      });
-
-      // Set up delete button
-      const deleteBtn = newContextMenu.querySelector('.delete-marker-btn');
-      deleteBtn.addEventListener('click', () => {
-        if (confirm(`Are you sure you want to delete ${currentMarker.markerData.unitId}? This action cannot be undone.`)) {
-          map.removeLayer(currentMarker);
-          newContextMenu.remove();
-          saveMapProgress();
-        }
-      });
-
-      // Set up tabs
-      const tabButtons = newContextMenu.querySelectorAll('.tab');
-      const tabPanels = newContextMenu.querySelectorAll('.tab-panel');
-
-      tabButtons.forEach(button => {
-        button.addEventListener('click', () => {
-          const tabId = button.dataset.tab;
-          tabButtons.forEach(btn => btn.classList.remove('active'));
-          button.classList.add('active');
-          tabPanels.forEach(panel => panel.classList.remove('active'));
-          newContextMenu.querySelector(`#${tabId}-tab`).classList.add('active');
-        });
-      });
-
-      // Initialize all the functionality for this context menu instance
-      initializeContextMenuFunctionality(newContextMenu, currentMarker);
-    }
-  }
-
-  function makeDraggable(element) {
-    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-    const header = element.querySelector('.context-menu-header');
-    const buttons = header.querySelectorAll('button');
-    
-    // Mouse events
-    header.onmousedown = dragMouseDown;
-    // Touch events
-    header.ontouchstart = dragTouchStart;
-
-    // Add a flag to track if we're dragging
-    let isDragging = false;
-    let touchStartTime = 0;
-    const TOUCH_DURATION_THRESHOLD = 200; // ms
-    const TOUCH_MOVEMENT_THRESHOLD = 5; // pixels
-
-    function dragMouseDown(e) {
-        // Don't initiate drag if clicking on a button
-        if (e.target.closest('button')) return;
-        
-        e.preventDefault();
-        pos3 = e.clientX;
-        pos4 = e.clientY;
-        document.onmouseup = closeDragElement;
-        document.onmousemove = elementDrag;
-    }
-
-    function dragTouchStart(e) {
-        // Don't initiate drag if touching a button
-        if (e.target.closest('button')) return;
-        
-        touchStartTime = Date.now();
-        const touch = e.touches[0];
-        pos3 = touch.clientX;
-        pos4 = touch.clientY;
-        isDragging = false;
-        
-        document.ontouchend = closeDragElement;
-        document.ontouchmove = elementTouchDrag;
-    }
-
-    function elementDrag(e) {
-        e.preventDefault();
-        isDragging = true;
-        pos1 = pos3 - e.clientX;
-        pos2 = pos4 - e.clientY;
-        pos3 = e.clientX;
-        pos4 = e.clientY;
-        updateElementPosition();
-    }
-
-    function elementTouchDrag(e) {
-        const touch = e.touches[0];
-        const touchMovement = Math.abs(touch.clientX - pos3) + Math.abs(touch.clientY - pos4);
-        
-        if (touchMovement > TOUCH_MOVEMENT_THRESHOLD) {
-            isDragging = true;
-            e.preventDefault();
-            pos1 = pos3 - touch.clientX;
-            pos2 = pos4 - touch.clientY;
-            pos3 = touch.clientX;
-            pos4 = touch.clientY;
-            updateElementPosition();
-        }
-    }
-
-    function updateElementPosition() {
-        // Get viewport dimensions
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-        
-        // Calculate new position
-        let newTop = element.offsetTop - pos2;
-        let newLeft = element.offsetLeft - pos1;
-        
-        // Get element dimensions
-        const elementWidth = element.offsetWidth;
-        const elementHeight = element.offsetHeight;
-        
-        // Keep element within viewport bounds
-        newTop = Math.max(0, Math.min(newTop, viewportHeight - elementHeight));
-        newLeft = Math.max(0, Math.min(newLeft, viewportWidth - elementWidth));
-        
-        // Update position
-        element.style.top = newTop + "px";
-        element.style.left = newLeft + "px";
-    }
-
-    function closeDragElement(e) {
-        const touchDuration = Date.now() - touchStartTime;
-        
-        // If it was a short touch and we didn't drag much, treat it as a click
-        if (!isDragging && touchDuration < TOUCH_DURATION_THRESHOLD) {
-            // Allow the click/touch to proceed normally
-            return;
-        }
-        
-        // Reset all event listeners
-        document.onmouseup = null;
-        document.onmousemove = null;
-        document.ontouchend = null;
-        document.ontouchmove = null;
-        isDragging = false;
-    }
-
-    // Add click/touch handlers to buttons that prevent drag
-    buttons.forEach(button => {
-        button.addEventListener('mousedown', (e) => {
-            e.stopPropagation();
-        });
-        
-        button.addEventListener('touchstart', (e) => {
-            e.stopPropagation();
-        });
-    });
-  }
-
-  function initializeContextMenuFunctionality(newContextMenu, currentMarker) {
-    const currentStatusDisplay = newContextMenu.querySelector('#current-status-display');
-    const latestNotesDisplay = newContextMenu.querySelector('#latest-notes-display');
-    const editStatusBtn = newContextMenu.querySelector('#edit-status-btn');
-    const statusEditSection = newContextMenu.querySelector('#status-edit-section');
-    const saveStatusBtn = newContextMenu.querySelector('#save-status-btn');
-    const unitStatusSelect = newContextMenu.querySelector('#unit-status');
-    const statusNotesTextarea = newContextMenu.querySelector('#status-notes');
-    const statusHistoryContainer = newContextMenu.querySelector('#status-history');
-    const partsList = newContextMenu.querySelector('#parts-list');
-    const partsHistoryContainer = newContextMenu.querySelector('#parts-history');
-    const showAddPartsBtn = newContextMenu.querySelector('#show-add-parts-btn');
-    const addPartsInput = newContextMenu.querySelector('#add-parts-input');
-    const partNameInput = newContextMenu.querySelector('#part-name');
-    const partNumberInput = newContextMenu.querySelector('#part-number');
-    const partReplacementDateInput = newContextMenu.querySelector('#part-replacement-date');
-    const saveNewPartBtn = newContextMenu.querySelector('#save-new-part-btn');
-    const tabButtons = newContextMenu.querySelectorAll('.tab');
-    const tabPanels = newContextMenu.querySelectorAll('.tab-panel');
-    const unitBrandInput = newContextMenu.querySelector('#unit-brand');
-    const unitModelInput = newContextMenu.querySelector('#unit-model');
-    const unitSerialInput = newContextMenu.querySelector('#unit-serial');
-    const unitMfgDateInput = newContextMenu.querySelector('#unit-mfg-date');
-    const unitFreonTypeSelect = newContextMenu.querySelector('#unit-freon-type');
-    const editDetailsBtn = newContextMenu.querySelector('#edit-details-btn');
-    const saveDetailsBtn = newContextMenu.querySelector('#save-details-btn');
-    const detailsDisplay = newContextMenu.querySelector('#details-display');
-    const detailsGrid = newContextMenu.querySelector('.details-grid');
-
-    let editingPartIndex = -1;
-
-    // Initialize display values
-    if (currentMarker.markerData) {
-      // Set initial status display
-      currentStatusDisplay.textContent = (currentMarker.markerData.status || 'UP').toUpperCase();
-      currentStatusDisplay.className = `status-text status-${currentMarker.markerData.status || 'up'}`;
-      
-      // Set initial notes display
-      latestNotesDisplay.textContent = currentMarker.markerData.notes ? `Notes: ${currentMarker.markerData.notes}` : '';
-      latestNotesDisplay.classList.toggle('has-notes', !!currentMarker.markerData.notes);
-      
-      // Set initial form values
-      unitStatusSelect.value = currentMarker.markerData.status || 'up';
-      statusNotesTextarea.value = currentMarker.markerData.notes || '';
-
-      // Initialize details
-      if (currentMarker.markerData.details) {
-        unitBrandInput.value = currentMarker.markerData.details.brand || '';
-        unitModelInput.value = currentMarker.markerData.details.model || '';
-        unitSerialInput.value = currentMarker.markerData.details.serial || '';
-        unitMfgDateInput.value = currentMarker.markerData.details.mfgDate || '';
-        unitFreonTypeSelect.value = currentMarker.markerData.details.freonType || '';
-        
-        const formattedDetails = `
-UNIT DETAILS:
-Brand:        ${currentMarker.markerData.details.brand || 'N/A'}
-Model:        ${currentMarker.markerData.details.model || 'N/A'}
-Serial:       ${currentMarker.markerData.details.serial || 'N/A'}
-Mfg Date:     ${currentMarker.markerData.details.mfgDate || 'N/A'}
-Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
-
-        detailsDisplay.textContent = formattedDetails;
-      }
-
-      // Initialize history displays
-      updateStatusHistory(statusHistoryContainer, currentMarker);
-      updatePartsHistory(partsHistoryContainer, currentMarker);
-      populatePartsList(partsList, currentMarker, editingPartIndex, partNameInput, partNumberInput, partReplacementDateInput, addPartsInput, showAddPartsBtn, saveNewPartBtn);
-    }
-
-    // Tab switching
-    tabButtons.forEach(button => {
-      button.addEventListener('click', () => {
-        const tabId = button.dataset.tab;
-        tabButtons.forEach(btn => btn.classList.remove('active'));
-        button.classList.add('active');
-        tabPanels.forEach(panel => panel.classList.remove('active'));
-        newContextMenu.querySelector(`#${tabId}-tab`).classList.add('active');
-      });
-    });
-
-    // Status editing
-    editStatusBtn.addEventListener('click', () => {
-      statusEditSection.classList.remove('hidden');
-    });
-
-    saveStatusBtn.addEventListener('click', () => {
-      if (currentMarker && currentMarker.markerData) {
-        const newStatus = unitStatusSelect.value;
-        const newNotes = statusNotesTextarea.value;
-
-        currentMarker.markerData.status = newStatus;
-        currentMarker.markerData.notes = newNotes;
-
-        setMarkerIcon(currentMarker);
-
-        currentStatusDisplay.textContent = newStatus.toUpperCase();
-        currentStatusDisplay.className = `status-text status-${newStatus}`;
-
-        latestNotesDisplay.textContent = newNotes ? `Notes: ${newNotes}` : '';
-        latestNotesDisplay.classList.toggle('has-notes', !!newNotes);
-
-        if (!currentMarker.markerData.history) {
-          currentMarker.markerData.history = { status: [], parts: [] };
-        }
-
-        const now = new Date();
-        const historyEntry = {
-          date: now,
-          status: newStatus,
-          notes: newNotes
-        };
-        currentMarker.markerData.history.status.unshift(historyEntry);
-
-        updateStatusHistory(statusHistoryContainer, currentMarker);
-        statusEditSection.classList.add('hidden');
-        saveMapProgress();
-      }
-    });
-
-    // Parts functionality
-    showAddPartsBtn.addEventListener('click', () => {
-      addPartsInput.classList.remove('hidden');
-      showAddPartsBtn.classList.add('hidden');
-      editingPartIndex = -1;
-      saveNewPartBtn.textContent = 'Save Part';
-    });
-
-    saveNewPartBtn.addEventListener('click', () => {
-      const partName = partNameInput.value.trim();
-      const partNumber = partNumberInput.value.trim();
-      const replacementDate = partReplacementDateInput.value;
-
-      if (partName && partNumber && currentMarker && currentMarker.markerData) {
-        const now = new Date();
-
-        if (!currentMarker.markerData.parts) {
-          currentMarker.markerData.parts = [];
-        }
-
-        if (!currentMarker.markerData.history) {
-          currentMarker.markerData.history = { status: [], parts: [] };
-        }
-
-        const newPart = {
-          name: partName,
-          number: partNumber,
-          replacementDate: replacementDate,
-          addedDate: now
-        };
-        
-        currentMarker.markerData.parts.push(newPart);
-        currentMarker.markerData.history.parts.unshift({
-          date: now,
-          action: editingPartIndex !== -1 ? 'updated' : 'added',
-          part: newPart
-        });
-
-        partNameInput.value = '';
-        partNumberInput.value = '';
-        partReplacementDateInput.value = '';
-        addPartsInput.classList.add('hidden');
-        showAddPartsBtn.classList.remove('hidden');
-        
-        populatePartsList(partsList, currentMarker, editingPartIndex, partNameInput, partNumberInput, partReplacementDateInput, addPartsInput, showAddPartsBtn, saveNewPartBtn);
-        updatePartsHistory(partsHistoryContainer, currentMarker);
-        saveMapProgress();
-      }
-    });
-
-    // Details functionality
-    editDetailsBtn.addEventListener('click', () => {
-      unitBrandInput.disabled = false;
-      unitModelInput.disabled = false;
-      unitSerialInput.disabled = false;
-      unitMfgDateInput.disabled = false;
-      unitFreonTypeSelect.disabled = false;
-
-      editDetailsBtn.style.display = 'none';
-      saveDetailsBtn.style.display = 'inline-block';
-
-      detailsDisplay.style.display = 'none';
-      detailsGrid.style.display = 'grid';
-    });
-
-    saveDetailsBtn.addEventListener('click', () => {
-      if (currentMarker && currentMarker.markerData) {
-        currentMarker.markerData.details = {
-          brand: unitBrandInput.value.trim(),
-          model: unitModelInput.value.trim(),
-          serial: unitSerialInput.value.trim(),
-          mfgDate: unitMfgDateInput.value,
-          freonType: unitFreonTypeSelect.value
-        };
-
-        unitBrandInput.disabled = true;
-        unitModelInput.disabled = true;
-        unitSerialInput.disabled = true;
-        unitMfgDateInput.disabled = true;
-        unitFreonTypeSelect.disabled = true;
-
-        editDetailsBtn.style.display = 'inline-block';
-        saveDetailsBtn.style.display = 'none';
-
-        const formattedDetails = `
-UNIT DETAILS:
-Brand:        ${currentMarker.markerData.details.brand || 'N/A'}
-Model:        ${currentMarker.markerData.details.model || 'N/A'}
-Serial:       ${currentMarker.markerData.details.serial || 'N/A'}
-Mfg Date:     ${currentMarker.markerData.details.mfgDate || 'N/A'}
-Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
-
-        detailsDisplay.textContent = formattedDetails;
-        detailsGrid.style.display = 'none';
-        detailsDisplay.style.display = 'block';
-        saveMapProgress();
-      }
-    });
-  }
-
-  // Marker List Toggle Functionality
-  const markerListToggle = document.getElementById('marker-list-toggle');
-  const markerListContainer = document.getElementById('marker-list-container');
-  const markerList = document.getElementById('marker-list');
-
-  function updateMarkerList() {
-    const searchInput = document.getElementById('marker-list-search').value.toLowerCase().trim();
-    
-    // Get filter checkbox states
-    const filterUp = document.getElementById('filter-up').checked;
-    const filterLimited = document.getElementById('filter-limited').checked;
-    const filterDown = document.getElementById('filter-down').checked;
-
-    markerList.innerHTML = ''; // Clear existing list
-    
-    map.eachLayer((layer) => {
-      if (layer instanceof L.Marker && layer.markerData) {
-        const status = (layer.markerData.status || 'up').toLowerCase();
-        const unitId = (layer.markerData.unitId || '').toLowerCase();
-        
-        // Determine if status matches selected filters
-        const statusMatchesFilter = 
-          (status === 'up' && filterUp) ||
-          (status === 'limited' && filterLimited) ||
-          (status === 'down' && filterDown);
-        
-        // Check if search input matches unit ID
-        const searchMatch = 
-          !searchInput || 
-          unitId.includes(searchInput);
-        
-        // Only add to list if both filter and search conditions are met
-        if (statusMatchesFilter && searchMatch) {
-          const markerListItem = document.createElement('div');
-          markerListItem.classList.add('marker-list-item');
-          markerListItem.setAttribute('draggable', 'true');
-          
-          markerListItem.innerHTML = `
-            <div>
-              <span class="marker-list-item-unit-id">${layer.markerData.unitId}</span>
-            </div>
-            <span class="marker-list-item-status status-${status}">${status.toUpperCase()}</span>
-          `;
-          
-          markerListItem.addEventListener('click', () => {
-            // Center map on this marker and show its context menu
-            map.setView(layer.getLatLng(), 20);
-            currentMarker = layer;
-            showContextMenu({
-              containerPoint: map.latLngToContainerPoint(layer.getLatLng()),
-              originalEvent: { stopPropagation: () => {} }
-            });
-
-            // Collapse the marker list
-            markerListContainer.classList.remove('visible');
-            markerListToggle.classList.remove('active');
-          });
-          
-          markerList.appendChild(markerListItem);
-        }
-      }
-    });
-
-    // Update count or show message if no markers match
-    if (markerList.children.length === 0) {
-      const noResultsMessage = document.createElement('div');
-      noResultsMessage.textContent = 'No units match your search or filter criteria.';
-      noResultsMessage.style.padding = '10px';
-      noResultsMessage.style.color = '#888';
-      noResultsMessage.style.textAlign = 'center';
-      markerList.appendChild(noResultsMessage);
-    }
-  }
-
-  markerListToggle.addEventListener('click', () => {
-    markerListContainer.classList.toggle('visible');
-    markerListToggle.classList.toggle('active');
-    updateMarkerList();
-  });
-
-  // Update marker list after any marker operations
-  map.on('layeradd', updateMarkerList);
-  map.on('layerremove', updateMarkerList);
-
-  function setupEnhancedSaveMapProgress(originalSaveMapProgress) {
-    return function() {
-      if (this !== window) {
-        // Prevent infinite recursion by using the original save function
-        originalSaveMapProgress.call(this);
-        updateMarkerList();
-      }
-    };
-  }
-
-  const originalSaveMapProgress = saveMapProgress;
-  saveMapProgress = setupEnhancedSaveMapProgress(originalSaveMapProgress);
-
-  const markerListSearch = document.getElementById('marker-list-search');
-  const filterCheckboxes = document.querySelectorAll('.marker-list-filters input[type="checkbox"]');
-
-  // Ensure initial list update and consistent filtering
-  function setupMarkerListFilters() {
-    markerListSearch.addEventListener('input', updateMarkerList);
-    filterCheckboxes.forEach(checkbox => {
-      checkbox.addEventListener('change', updateMarkerList);
-    });
-
-    // Trigger initial list update
-    updateMarkerList();
-  }
-
-  // Call the setup function when the map is ready
-  setupMarkerListFilters();
-
-  function enhanceMarkerList() {
-    setupMarkerListDragAndDrop();
-  }
-
-  function setupMarkerListDragAndDrop() {
-    const markerList = document.getElementById('marker-list');
-    let draggedItem = null;
-    let startY = 0;
-    let startIndex = 0;
-
-    // Track touch movement
-    let touchStartTime = 0;
-    const TOUCH_DURATION_THRESHOLD = 200; // ms
-    const TOUCH_MOVEMENT_THRESHOLD = 5; // pixels
-    let isTouchMoving = false;
-
-    // Helper function to get the index of an element
-    function getElementIndex(el) {
-      const children = [...markerList.children];
-      return children.indexOf(el);
-    }
-
-    // Helper function to get element at specific y-coordinate
-    function getElementAtPosition(y) {
-      const elements = [...markerList.querySelectorAll('.marker-list-item')];
-      return elements.find(el => {
-        const box = el.getBoundingClientRect();
-        return y >= box.top && y <= box.bottom;
-      });
-    }
-
-    markerList.addEventListener('touchstart', (e) => {
-      if (!e.target.closest('.marker-list-item')) return;
-      
-      const item = e.target.closest('.marker-list-item');
-      touchStartTime = Date.now();
-      startY = e.touches[0].clientY;
-      startIndex = getElementIndex(item);
-      isTouchMoving = false;
-
-      // Clone the item for visual feedback
-      draggedItem = item.cloneNode(true);
-      draggedItem.classList.add('dragging');
-      draggedItem.style.position = 'absolute';
-      draggedItem.style.width = `${item.offsetWidth}px`;
-      draggedItem.style.height = `${item.offsetHeight}px`;
-      draggedItem.style.opacity = '0.8';
-      draggedItem.style.zIndex = '1000';
-      
-      // Hide original item
-      item.style.opacity = '0';
-      
-      document.body.appendChild(draggedItem);
-      positionDraggedItem(e.touches[0].clientY);
-    }, { passive: false });
-
-    markerList.addEventListener('touchmove', (e) => {
-      if (!draggedItem) return;
-      
-      e.preventDefault();
-      isTouchMoving = true;
-      
-      const touch = e.touches[0];
-      positionDraggedItem(touch.clientY);
-      
-      const elementAtPosition = getElementAtPosition(touch.clientY);
-      if (elementAtPosition && elementAtPosition !== draggedItem) {
-        const currentIndex = getElementIndex(elementAtPosition);
-        if (currentIndex !== startIndex) {
-          // Reorder elements in the list
-          const items = [...markerList.children];
-          const removed = items.splice(startIndex, 1)[0];
-          items.splice(currentIndex, 0, removed);
-          
-          // Update DOM
-          items.forEach(item => markerList.appendChild(item));
-          startIndex = currentIndex;
-        }
-      }
-    }, { passive: false });
-
-    markerList.addEventListener('touchend', (e) => {
-      if (!draggedItem) return;
-      
-      const touchDuration = Date.now() - touchStartTime;
-      
-      // If it was a short touch and we didn't move much, treat it as a click
-      if (!isTouchMoving && touchDuration < TOUCH_DURATION_THRESHOLD) {
-        // Handle click event (show marker on map, etc.)
-        const originalItem = markerList.children[startIndex];
-        if (originalItem) {
-          originalItem.click();
-        }
-      }
-      
-      // Clean up
-      if (draggedItem.parentNode) {
-        draggedItem.parentNode.removeChild(draggedItem);
-      }
-      
-      // Show original item
-      const items = [...markerList.children];
-      items[startIndex].style.opacity = '1';
-      
-      draggedItem = null;
-      isTouchMoving = false;
-    });
-
-    function positionDraggedItem(y) {
-      if (draggedItem) {
-        draggedItem.style.top = `${y - draggedItem.offsetHeight / 2}px`;
-        draggedItem.style.left = `${markerList.offsetLeft}px`;
-      }
-    }
-
-    // Keep mouse events for desktop
-    markerList.addEventListener('dragstart', (e) => {
-      if (e.target.closest('.marker-list-item')) {
-        draggedItem = e.target.closest('.marker-list-item');
-        draggedItem.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', '');
-      }
-    });
-
-    markerList.addEventListener('dragend', (e) => {
-      if (draggedItem) {
-        draggedItem.classList.remove('dragging');
-        draggedItem = null;
-      }
-    });
-
-    markerList.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      if (!draggedItem) return;
-
-      const afterElement = getDragAfterElement(markerList, e.clientY);
-      if (afterElement) {
-        markerList.insertBefore(draggedItem, afterElement);
-      } else {
-        markerList.appendChild(draggedItem);
-      }
-    });
-
-    function getDragAfterElement(container, y) {
-      const draggableElements = [...container.querySelectorAll('.marker-list-item:not(.dragging)')];
-      return draggableElements.reduce((closest, child) => {
-        const box = child.getBoundingClientRect();
-        const offset = y - box.top - box.height / 2;
-        if (offset < 0 && offset > closest.offset) {
-          return { offset: offset, element: child };
-        } else {
-          return closest;
-        }
-      }, { offset: Number.NEGATIVE_INFINITY }).element;
-    }
-  }
-
-  // Call the setup function after the filters are set up
-  setupMarkerListFilters();
-  enhanceMarkerList();
-  
-  // Modal for multiple markers
-  const multipleMarkersModal = document.getElementById('multiple-markers-modal');
-  const addMarkerRowBtn = document.getElementById('add-marker-row-btn');
-  const multipleMarkersContainer = document.getElementById('multiple-markers-container');
-  const saveMultipleMarkersBtn = document.getElementById('save-multiple-markers-btn');
-  const cancelMultipleMarkersBtn = document.getElementById('cancel-multiple-markers-btn');
-  const closeModalBtn = document.querySelector('.close-modal');
-
-  // Open modal for multiple markers
-  function openMultipleMarkersModal() {
-    // Reset the modal to initial state
-    multipleMarkersContainer.innerHTML = `
-        <div class="marker-input-row">
-            <input type="text" class="unit-id-input" placeholder="UNIT-ID">
-            <button class="remove-marker-row">-</button>
-        </div>
-    `;
-    multipleMarkersModal.style.display = 'block';
-  }
-
-  // Add a new marker input row
-  addMarkerRowBtn.addEventListener('click', () => {
-    const newRow = document.createElement('div');
-    newRow.classList.add('marker-input-row');
-    newRow.innerHTML = `
-        <input type="text" class="unit-id-input" placeholder="UNIT-ID">
-        <button class="remove-marker-row">-</button>
-    `;
-    multipleMarkersContainer.appendChild(newRow);
-
-    // Add event listener to remove button
-    newRow.querySelector('.remove-marker-row').addEventListener('click', () => {
-      // Don't allow removing the last row
-      if (multipleMarkersContainer.children.length > 1) {
-        newRow.remove();
-      }
-    });
-  });
-
-  // Close modal
-  function closeMultipleMarkersModal() {
-    multipleMarkersModal.style.display = 'none';
-  }
-
-  closeModalBtn.addEventListener('click', closeMultipleMarkersModal);
-  cancelMultipleMarkersBtn.addEventListener('click', closeMultipleMarkersModal);
-
-  // Save multiple markers
-  saveMultipleMarkersBtn.addEventListener('click', () => {
-    const unitIdInputs = document.querySelectorAll('.unit-id-input');
-    const validUnitIds = [];
-
-    // Validate and collect unit IDs
-    unitIdInputs.forEach(input => {
-      const unitId = input.value.trim();
-      if (unitId) {
-        validUnitIds.push(unitId);
-      }
-    });
-
-    // Check if we have any valid unit IDs
-    if (validUnitIds.length > 0 && rightClickPoint) {
-      // Calculate spread for multiple markers
-      const spreadRadius = Math.min(validUnitIds.length * 0.0001, 0.001); // Adjust spread based on number of markers
-
-      validUnitIds.forEach((unitId, index) => {
-        // Slightly offset each marker
-        const offsetLat = rightClickPoint.lat + (Math.random() - 0.5) * spreadRadius;
-        const offsetLng = rightClickPoint.lng + (Math.random() - 0.5) * spreadRadius;
-
-        const marker = L.marker([offsetLat, offsetLng], {
-          draggable: false,
-          icon: greenIcon
-        }).addTo(map)
-        .on('click', function(markerEvent) {
-          markerEvent.originalEvent.stopPropagation();
-          if (!this.markerData) {
-            this.markerData = {
-              unitId: unitId,
-              status: 'up',
-              notes: '',
-              details: {},
-              parts: [],
-              history: {
-                status: [],
-                parts: []
-              }
-            };
-          }
-          currentMarker = this;
-          showContextMenu(markerEvent);
-        });
-
-        marker.markerData = {
-          unitId: unitId,
+    if (!currentMarker || !contextMenu) return;
+
+    try {
+      // Initialize marker data if needed
+      if (!currentMarker.markerData) {
+        currentMarker.markerData = {
+          unitId: 'UNIT-ID',
           status: 'up',
           notes: '',
-          details: {},
+          statusImageUrl: '',
+          details: {
+            brand: '',
+            model: '',
+            serial: '',
+            mfgDate: '',
+            freonType: ''
+          },
           parts: [],
           history: {
             status: [],
             parts: []
           }
         };
-      });
+      }
 
-      saveMapProgress();
-      closeMultipleMarkersModal();
+      const headerUnitId = document.getElementById('header-unit-id');
+      if (headerUnitId) {
+        headerUnitId.textContent = currentMarker.markerData.unitId || 'UNIT-ID';
+      }
+
+      // Update status display
+      const currentStatusDisplay = document.getElementById('current-status-display');
+      if (currentStatusDisplay) {
+        currentStatusDisplay.textContent = (currentMarker.markerData.status || 'UP').toUpperCase();
+        currentStatusDisplay.className = `status-text status-${currentMarker.markerData.status || 'up'}`;
+      }
+
+      // Update notes
+      const statusNotesTextarea = document.getElementById('status-notes');
+      if (statusNotesTextarea) {
+        statusNotesTextarea.value = currentMarker.markerData.notes || '';
+      }
+
+      // Update latest notes display
+      const latestNotesDisplay = document.getElementById('latest-notes-display');
+      if (latestNotesDisplay) {
+        latestNotesDisplay.textContent = currentMarker.markerData.notes ? `Notes: ${currentMarker.markerData.notes}` : '';
+        latestNotesDisplay.classList.toggle('has-notes', !!currentMarker.markerData.notes);
+      }
+
+      // Update status image URL in edit field and display
+      const statusImageUrlInput = document.getElementById('status-image-url');
+      const statusImage = document.querySelector('.status-image');
+      
+      if (statusImageUrlInput) {
+        statusImageUrlInput.value = currentMarker.markerData.statusImageUrl || '';
+      }
+
+      if (statusImage) {
+        statusImage.src = currentMarker.markerData.statusImageUrl || 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTN3lFE1mgBbxtpLcZeDQVMNl-JX0w5cI6pzQ&s';
+      }
+
+      // Show menu
+      contextMenu.classList.remove('hidden');
+      contextMenu.style.opacity = '0';
+
+      // Calculate position
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const menuWidth = contextMenu.offsetWidth;
+      const menuHeight = contextMenu.offsetHeight;
+
+      let left, top;
+      if (event.containerPoint) {
+        left = event.containerPoint.x;
+        top = event.containerPoint.y;
+      } else {
+        const markerPos = map.latLngToContainerPoint(currentMarker.getLatLng());
+        left = markerPos.x;
+        top = markerPos.y;
+      }
+
+      // Adjust position to keep menu in viewport
+      if (left + menuWidth > viewportWidth) {
+        left = Math.max(0, viewportWidth - menuWidth - 10);
+      }
+      if (top + menuHeight > viewportHeight) {
+        top = Math.max(0, viewportHeight - menuHeight - 10);
+      }
+
+      // Set position and show menu
+      contextMenu.style.left = `${Math.max(10, left)}px`;
+      contextMenu.style.top = `${Math.max(10, top)}px`;
+      contextMenu.style.opacity = '1';
+
+      // Refresh all panels
+      populatePartsList();
+      populateDetailsTab();
+      updateStatusHistory();
+      updatePartsHistory();
+
+    } catch (error) {
+      console.error('Error showing context menu:', error);
+    }
+  }
+
+  function hideContextMenu() {
+    contextMenu.classList.add('hidden');
+    addPartsInput.classList.add('hidden'); // Hide part input when context menu closes
+    showAddPartsBtn.classList.remove('hidden'); // Show "Add Part" button
+    editingPartIndex = -1; // Reset editing part index
+    saveNewPartBtn.textContent = 'Save Part'; // Reset button text
+  }
+
+  // Modify the history display functions to handle ISO date strings
+  function updateStatusHistory() {
+    if (currentMarker?.markerData?.history?.status) {
+      try {
+        statusHistoryContainer.innerHTML = '';
+        currentMarker.markerData.history.status.forEach(entry => {
+          if (!entry) return;
+          
+          const historyEntry = document.createElement('div');
+          historyEntry.classList.add('history-entry');
+          
+          const entryDate = new Date(entry.date);
+          const formattedDate = !isNaN(entryDate) ? entryDate.toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          }) : 'Invalid Date';
+
+          historyEntry.innerHTML = `
+            <span class="history-date">${formattedDate}</span>
+            <span class="history-status status-text status-${entry.status || 'unknown'}">${(entry.status || 'UNKNOWN').toUpperCase()}</span>
+            ${entry.notes ? `<span class="history-notes">"${entry.notes}"</span>` : ''}
+          `;
+          
+          statusHistoryContainer.appendChild(historyEntry);
+        });
+      } catch (error) {
+        console.error('Error in updateStatusHistory:', error);
+        statusHistoryContainer.innerHTML = '<div class="error">Error loading status history</div>';
+      }
+    }
+  }
+
+  function updatePartsHistory() {
+    if (currentMarker?.markerData?.history?.parts) {
+      try {
+        partsHistoryContainer.innerHTML = '';
+        currentMarker.markerData.history.parts.forEach(entry => {
+          if (!entry?.part) return;
+          
+          const entryDate = new Date(entry.date);
+          const formattedDate = !isNaN(entryDate) ? entryDate.toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          }) : 'Invalid Date';
+
+          partsHistoryContainer.innerHTML += `
+            <div class="history-entry">
+              <span class="history-date">${formattedDate}</span>
+              <span class="history-part">${entry.part.name || ''} (${entry.part.number || ''})</span>
+              ${entry.part.replacementDate ? `<span class="history-replacement-date">Replaced: ${entry.part.replacementDate}</span>` : ''}
+            </div>
+          `;
+        });
+      } catch (error) {
+        console.error('Error in updatePartsHistory:', error);
+        partsHistoryContainer.innerHTML = '<div class="error">Error loading parts history</div>';
+      }
+    }
+  }
+
+  function syncMarkerToFirebase(marker) {
+    try {
+      if (!marker) {
+        console.warn('No marker provided to syncMarkerToFirebase');
+        return;
+      }
+
+      const markerData = safeGetMarkerData(marker);
+      const data = {
+        latlng: marker.getLatLng(),
+        position: marker.listPosition || 0,
+        markerData: markerData
+      };
+
+      if (marker.firebaseKey) {
+        markersRef.child(marker.firebaseKey).set(data);
+      } else {
+        const newMarkerRef = markersRef.push(data);
+        marker.firebaseKey = newMarkerRef.key;
+      }
+      updateUnitList();
+    } catch (error) {
+      console.error('Error syncing marker to Firebase:', error);
+    }
+  }
+
+  function updateUnitCount() {
+    // Only count elements that are unit-list-items but not building-items
+    const count = document.querySelectorAll('.unit-list-item:not(.building-item)').length;
+    const unitCount = document.getElementById('unit-count');
+    if (unitCount) {
+      unitCount.textContent = `(${count})`;
+    }
+  }
+
+  function updateUnitList() {
+    const searchInput = document.getElementById('unit-search');
+    const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+    const activeFilter = document.querySelector('.status-filter-btn.active')?.dataset.status || 'all';
+
+    // Clear existing units but keep buildings
+    const existingUnits = document.querySelectorAll('.unit-list-item:not(.building-item)');
+    existingUnits.forEach(unit => unit.remove());
+
+    // Get all markers and sort by position
+    const sortedMarkers = Array.from(markersMap.entries())
+      .sort(([,a], [,b]) => (a.listPosition || 0) - (b.listPosition || 0));
+
+    sortedMarkers.forEach(([key, marker]) => {
+      const unitId = marker.markerData?.unitId || 'UNIT-ID';
+      const status = marker.markerData?.status || 'up';
+      
+      // Apply filters
+      const matchesSearch = unitId.toLowerCase().includes(searchTerm);
+      const matchesStatus = activeFilter === 'all' || status === activeFilter;
+      
+      if (matchesSearch && matchesStatus) {
+        const li = document.createElement('li');
+        li.className = 'unit-list-item';
+        li.draggable = !isListLocked;
+        li.dataset.position = marker.listPosition || 0;
+        li.dataset.unitKey = key; // Add the unit key as a data attribute
+
+        li.innerHTML = `
+          <span class="unit-id">${unitId}</span>
+          <span class="unit-list-status status-text status-${status}">${status.toUpperCase()}</span>
+          <button class="delete-unit-btn" data-unit-key="${key}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        `;
+
+        // Add click handler for the list item
+        li.addEventListener('click', (e) => {
+          if (!e.target.classList.contains('delete-unit-btn')) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const unitKey = li.dataset.unitKey; // Get the unit key from the data attribute
+            
+            if (unitKey && markersMap.has(unitKey)) {
+              const marker = markersMap.get(unitKey);
+              currentMarker = marker;
+
+              const rect = li.getBoundingClientRect();
+              showContextMenu({
+                containerPoint: {
+                  x: rect.right,
+                  y: rect.top
+                }
+              });
+            }
+          }
+        });
+
+        // Add delete button event listener
+        const deleteBtn = li.querySelector('.delete-unit-btn');
+        deleteBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const unitKey = deleteBtn.dataset.unitKey;
+          
+          // Remove from Firebase
+          if (unitKey) {
+            markersRef.child(unitKey).remove().then(() => {
+              // Marker removal will be handled by Firebase listener
+              console.log('Unit deleted successfully');
+            }).catch((error) => {
+              console.error('Error deleting unit:', error);
+            });
+          }
+        });
+
+        // Insert at the correct position
+        const items = Array.from(unitList.children);
+        const insertPosition = items.findIndex(item => 
+          Number(item.dataset.position) > Number(marker.listPosition || 0)
+        );
+
+        if (insertPosition === -1) {
+          unitList.appendChild(li);
+        } else {
+          unitList.insertBefore(li, items[insertPosition]);
+        }
+      }
+    });
+
+    updateUnitCount();
+    updateLockState();
+  }
+
+  unitList.addEventListener('dragend', (e) => {
+    if (e.target.classList.contains('unit-list-item')) {
+      const items = Array.from(unitList.children);
+      items.forEach((item, index) => {
+        const position = index; // Use simple index instead of timestamp
+        item.dataset.position = position;
+
+        // Handle units
+        if (!item.classList.contains('building-item')) {
+          const unitKey = item.querySelector('.delete-unit-btn')?.dataset.unitKey;
+          if (unitKey && markersMap.has(unitKey)) {
+            const marker = markersMap.get(unitKey);
+            marker.listPosition = position;
+            // Update Firebase with the new position
+            markersRef.child(unitKey).update({
+              position: position
+            });
+          }
+        }
+        // Handle buildings
+        else {
+          const buildingKey = item.dataset.buildingKey;
+          if (buildingKey) {
+            buildingsRef.child(buildingKey).update({
+              position: position
+            });
+          }
+        }
+      });
+    }
+  });
+
+  function addBuildingToFirebase(buildingName) {
+    if (buildingName.trim()) {
+      // Get the current number of items to use as position
+      const currentItems = document.querySelectorAll('.unit-list-item').length;
+      buildingsRef.push({
+        name: buildingName,
+        position: currentItems
+      }).then(() => {
+        const buildingNameInput = document.getElementById('building-name-input');
+        if (buildingNameInput) {
+          buildingNameInput.value = '';
+        }
+      });
+    }
+  }
+
+  document.getElementById('add-building-button').addEventListener('click', () => {
+    const buildingNameInput = document.getElementById('building-name-input');
+    const buildingName = buildingNameInput.value.trim();
+    if (buildingName) {
+      addBuildingToFirebase(buildingName);
+    }
+  });
+
+  function addBuildingToUI(buildingData, buildingKey) {
+    // Check if building already exists
+    const existingBuilding = document.querySelector(`[data-building-key="${buildingKey}"]`);
+    if (existingBuilding) {
+      return;
     }
 
-    // Hide the map context menu
-    mapContextMenu.classList.add('hidden');
-    rightClickPoint = null;
+    const li = document.createElement('li');
+    li.className = 'unit-list-item building-item';
+    li.draggable = !isListLocked;
+    li.dataset.buildingKey = buildingKey;
+    li.dataset.position = buildingData.position || 0;
+
+    li.innerHTML = `
+      <span class="unit-id">${buildingData.name}</span>
+      <button class="delete-building-btn" data-key="${buildingKey}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    `;
+
+    const deleteBtn = li.querySelector('.delete-building-btn');
+    deleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      buildingsRef.child(buildingKey).remove();
+      li.remove();
+      updateUnitCount();
+    });
+
+    // Insert at the correct position
+    const items = Array.from(unitList.children);
+    const insertPosition = items.findIndex(item => 
+      Number(item.dataset.position) > Number(buildingData.position)
+    );
+
+    if (insertPosition === -1) {
+      unitList.appendChild(li);
+    } else {
+      unitList.insertBefore(li, items[insertPosition]);
+    }
+    updateLockState();
+  }
+
+  function updateBuildingList() {
+    // Clear existing buildings first
+    const existingBuildings = document.querySelectorAll('.building-item');
+    existingBuildings.forEach(building => building.remove());
+    
+    buildingsRef.once('value').then(snapshot => {
+      const buildings = [];
+      snapshot.forEach(childSnapshot => {
+        buildings.push({
+          key: childSnapshot.key,
+          data: childSnapshot.val()
+        });
+      });
+      
+      // Sort buildings by position before adding to UI
+      buildings.sort((a, b) => (a.data.position || 0) - (b.data.position || 0));
+      
+      buildings.forEach(building => {
+        addBuildingToUI(building.data, building.key);
+      });
+      updateUnitCount();
+    });
+  }
+
+  function initializeBuildingsListener() {
+    buildingsRef.off(); // Remove any existing listeners
+    
+    buildingsRef.on('child_added', (snapshot) => {
+      const buildingData = snapshot.val();
+      addBuildingToUI(buildingData, snapshot.key);
+      updateUnitCount();
+    });
+
+    buildingsRef.on('child_removed', (snapshot) => {
+      const buildingElement = document.querySelector(`[data-building-key="${snapshot.key}"]`);
+      if (buildingElement) {
+        buildingElement.remove();
+        updateUnitCount();
+      }
+    });
+
+    buildingsRef.on('child_changed', (snapshot) => {
+      const buildingElement = document.querySelector(`[data-building-key="${snapshot.key}"]`);
+      if (buildingElement) {
+        const nameElement = buildingElement.querySelector('.unit-id');
+        if (nameElement) {
+          nameElement.textContent = snapshot.val().name;
+        }
+        buildingElement.dataset.position = snapshot.val().position || 0;
+        updateBuildingList(); // Refresh list to ensure correct positioning
+      }
+    });
+  }
+
+  // Initialize Firebase listeners after map is ready
+  function initializeFirebaseListeners() {
+    // Listen for new markers
+    markersRef.on('child_added', (snapshot) => {
+      const key = snapshot.key;
+      const data = snapshot.val();
+      if (!markersMap.has(key)) {
+        createMarkerFromData(key, data);
+        updateUnitList();
+      }
+    });
+
+    // Listen for marker updates
+    markersRef.on('child_changed', (snapshot) => {
+      const key = snapshot.key;
+      const data = snapshot.val();
+      const marker = markersMap.get(key);
+      if (marker) {
+        marker.setLatLng(data.latlng);
+        marker.markerData = data.markerData;
+        setMarkerIcon(marker);
+        updateUnitList();
+      }
+    });
+
+    // Listen for marker deletions
+    markersRef.on('child_removed', (snapshot) => {
+      const key = snapshot.key;
+      const marker = markersMap.get(key);
+      if (marker) {
+        map.removeLayer(marker);
+        markersMap.delete(key);
+        updateUnitList();
+      }
+    });
+  }
+
+  initializeFirebaseListeners();
+
+  map.on('contextmenu', function(e) {
+    e.originalEvent.preventDefault(); // Prevent default right-click
+    return false;
   });
-}
+
+  initializeBuildingsListener();
+  updateUnitList();
+  updateBuildingList(); // Initial load of buildings
+
+  function initializeStatusFilters() {
+    const statusFilters = document.querySelectorAll('.status-filter-btn');
+  
+    statusFilters.forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Update active state
+        statusFilters.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        // Update list
+        updateUnitList();
+      });
+    });
+  }
+
+  initializeStatusFilters();
+
+  // Save map progress when rotation changes
+  function saveMapProgress() {
+    if (map) {
+      const mapState = {
+        center: map.getCenter(),
+        zoom: map.getZoom(),
+        bearing: map.getBearing()
+      };
+      localStorage.setItem('mapViewState', JSON.stringify(mapState));
+    }
+  }
+
+  // Modify the edit unit ID handler
+  const editUnitIdBtn = document.getElementById('edit-unit-id-btn');
+  editUnitIdBtn.addEventListener('click', () => {
+    const headerUnitId = document.getElementById('header-unit-id');
+    if (!headerUnitId) return;
+
+    const currentId = headerUnitId.textContent;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = 'unit-id-input';
+    input.value = currentId;
+    
+    headerUnitId.replaceWith(input);
+    input.focus();
+    input.select();
+
+    let isSaving = false;
+
+    const saveChanges = () => {
+      if (isSaving) return;
+      isSaving = true;
+
+      const input = document.getElementById('unit-id-input');
+      if (!input) return;
+
+      const newId = input.value.trim();
+      
+      // Create new header element
+      const headerUnitId = document.createElement('span');
+      headerUnitId.id = 'header-unit-id';
+      headerUnitId.textContent = newId || currentId;
+
+      // Get the container and existing input
+      const container = document.getElementById('context-menu-header');
+      const existingInput = document.getElementById('unit-id-input');
+      
+      // Only proceed if elements exist
+      if (container && existingInput) {
+        existingInput.replaceWith(headerUnitId);
+      }
+
+      // Update marker and UI if we have a valid new ID
+      if (currentMarker && newId) {
+        currentMarker.markerData.unitId = newId;
+        syncMarkerToFirebase(currentMarker);
+        updateUnitList();
+      }
+    };
+
+    const handleBlur = () => {
+      saveChanges();
+      input.removeEventListener('blur', handleBlur);
+      input.removeEventListener('keypress', handleKeypress);
+    };
+
+    const handleKeypress = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        saveChanges();
+        input.removeEventListener('blur', handleBlur);
+        input.removeEventListener('keypress', handleKeypress);
+      }
+    };
+
+    input.addEventListener('blur', handleBlur);
+    input.addEventListener('keypress', handleKeypress);
+  });
+
+  // Function to create a marker
+  function createMarkerFromData(key, data) {
+    const marker = L.marker(data.latlng, {
+      draggable: false
+    }).addTo(map);
+    
+    marker.markerData = {
+      unitId: data.markerData?.unitId || 'UNIT-ID',
+      status: data.markerData?.status || 'up',
+      notes: data.markerData?.notes || '',
+      statusImageUrl: data.markerData?.statusImageUrl || '',
+      details: {
+        brand: data.markerData?.details?.brand || '',
+        model: data.markerData?.details?.model || '',
+        serial: data.markerData?.details?.serial || '',
+        mfgDate: data.markerData?.details?.mfgDate || '',
+        freonType: data.markerData?.details?.freonType || ''
+      },
+      parts: data.markerData?.parts || [],
+      history: {
+        status: data.markerData?.history?.status || [],
+        parts: data.markerData?.history?.parts || []
+      }
+    };
+    
+    marker.firebaseKey = key;
+    marker.listPosition = data.position || 0; // Store position
+
+    marker.on('click', function(e) {
+      e.originalEvent.stopPropagation();
+      currentMarker = this;
+      showContextMenu({
+        containerPoint: map.latLngToContainerPoint(marker.getLatLng())
+      });
+    });
+
+    setMarkerIcon(marker);
+    markersMap.set(key, marker);
+    updateLockState();
+    return marker;
+  }
+
+  // Define custom icons
+  const greenIcon = L.icon({
+    iconUrl: 'https://i.postimg.cc/8zVGRn1G/Adobe-Express-file-1.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+    iconSize: [50, 50],     // Increased size
+    iconAnchor: [20, 40],   // Adjusted to center the icon
+    popupAnchor: [1, -34],
+    shadowSize: [0, 0]
+   // filter: hue-rotate(90deg) saturate(200%)
+    
+  });
+
+  const redIcon = L.icon({
+    iconUrl: 'https://i.postimg.cc/8zVGRn1G/Adobe-Express-file-1.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+    iconSize: [50, 50],     // Increased size
+    iconAnchor: [20, 40],   // Adjusted to center the icon
+    popupAnchor: [1, -34],
+    shadowSize: [0, 0]
+  });
+
+  const yellowIcon = L.icon({
+    iconUrl: 'https://i.postimg.cc/8zVGRn1G/Adobe-Express-file-1.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+    iconSize: [50, 50],     // Increased size
+    iconAnchor: [20, 40],   // Adjusted to center the icon
+    popupAnchor: [1, -34],
+    shadowSize: [0, 0]
+  });
+
+  // Function to set marker icon based on status
+  function setMarkerIcon(marker) {
+    if (marker.markerData) {
+      let status = marker.markerData.status;
+      let icon, labelText;
+
+      // Add right-click handling for markers
+      marker.off('contextmenu'); // Remove any existing handler
+      marker.on('contextmenu', function(e) {
+        e.originalEvent.preventDefault(); // Prevent default right-click
+        
+        // Create and show a simple marker context menu
+        let markerMenu = document.createElement('div');
+        markerMenu.className = 'marker-context-menu';
+        markerMenu.innerHTML = `
+          <ul>
+            <li id="delete-marker-option">Delete Marker</li>
+          </ul>
+        `;
+        
+        // Position menu at click location
+        markerMenu.style.left = e.originalEvent.pageX + 'px';
+        markerMenu.style.top = e.originalEvent.pageY + 'px';
+        
+        // Remove any existing marker menus
+        document.querySelectorAll('.marker-context-menu').forEach(menu => menu.remove());
+        
+        // Add menu to document
+        document.body.appendChild(markerMenu);
+        
+        // Handle delete option click
+        document.getElementById('delete-marker-option').addEventListener('click', () => {
+          if (marker.firebaseKey) {
+            markersRef.child(marker.firebaseKey).remove();
+          }
+          map.removeLayer(marker);
+          markersMap.delete(marker.firebaseKey);
+          markerMenu.remove();
+        });
+        
+        // Close menu when clicking elsewhere
+        document.addEventListener('click', function closeMenu(e) {
+          if (!markerMenu.contains(e.target)) {
+            markerMenu.remove();
+            document.removeEventListener('click', closeMenu);
+          }
+        });
+      });
+
+      if (status === 'down') {
+        icon = redIcon;
+        labelText = "🟥";
+      } else if (status === 'limited') {
+        icon = yellowIcon;
+        labelText = "🟨";
+      } else if (status === 'up') {
+        icon = greenIcon;
+        labelText = "🟩";
+      } else {
+        icon = greenIcon; // Default to green for unknown status
+        labelText = "🟢";
+      }
+
+      // Set the icon
+      marker.setIcon(icon);
+
+      // Remove any existing tooltip before adding a new one
+      marker.unbindTooltip();
+
+      // Bind a permanent tooltip (label) above the icon
+      marker.bindTooltip(labelText, {
+        permanent: true,  // Always visible
+        direction: "top", // Position above the marker
+        offset: [0, -40], // Adjust position to align properly
+        className: "custom-tooltip1"
+      });
+    }
+  }
+
+  // Helper function to handle undefined and null cases
+  function safeGetMarkerData(marker) {
+    if (!marker || !marker.markerData) {
+      return {
+        unitId: 'UNIT-ID',
+        status: 'up',
+        notes: '',
+        statusImageUrl: '',
+        details: {
+          brand: '',
+          model: '',
+          serial: '',
+          mfgDate: '',
+          freonType: ''
+        },
+        parts: [],
+        history: {
+          status: [],
+          parts: []
+        }
+      };
+    }
+    return marker.markerData;
+  }
+
+  // Add search input event listener
+  const searchInput = document.getElementById('unit-search');
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      updateUnitList();
+    });
+  }
+
+  function initializeListLockToggle() {
+    const toggleLockButton = document.getElementById('toggle-lock-button');
+    const unitListItems = document.querySelectorAll('.unit-list-item');
+    
+    // Set initial state
+    updateLockState();
+    
+    toggleLockButton.addEventListener('click', (e) => {
+      // Prevent event from bubbling up to collapsible header
+      e.stopPropagation();
+      
+      isListLocked = !isListLocked;
+      updateLockState();
+      
+      // Update the lock icon
+      toggleLockButton.innerHTML = isListLocked ? `
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+      ` : `
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+        </svg>
+      `;
+    });
+  }
+
+  function updateLockState() {
+    const unitListItems = document.querySelectorAll('.unit-list-item');
+    unitListItems.forEach(item => {
+      item.draggable = !isListLocked;
+      if (isListLocked) {
+        item.classList.add('locked');
+      } else {
+        item.classList.remove('locked');
+      }
+    });
+  }
+
+  unitList.addEventListener('dragstart', (e) => {
+    if (isListLocked || !e.target.classList.contains('unit-list-item')) {
+      e.preventDefault();
+      return;
+    }
+    draggedItem = e.target;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', '');
+    setTimeout(() => {
+      e.target.classList.add('dragging');
+    }, 0);
+  });
+
+  initializeListLockToggle();
+});
