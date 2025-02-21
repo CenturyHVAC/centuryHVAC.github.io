@@ -176,10 +176,26 @@ document.addEventListener('DOMContentLoaded', () => {
       const detailsDisplay = document.getElementById('details-display');
       const editDetailsBtn = document.getElementById('edit-details-btn');
       const saveDetailsBtn = document.getElementById('save-details-btn');
+      const statusImageContainer = document.querySelector('.status-image-container');
+
+      // Reset tab states
+      const tabButtons = document.querySelectorAll('.tab');
+      const tabPanels = document.querySelectorAll('.tab-panel');
+      
+      // Set first tab (Status) as active, hide others
+      tabButtons.forEach(btn => btn.classList.remove('active'));
+      tabPanels.forEach(panel => panel.classList.remove('active'));
+      tabButtons[0].classList.add('active');
+      tabPanels[0].classList.add('active');
 
       // Reset status editing
       if (statusEditSection) {
         statusEditSection.classList.add('hidden');
+      }
+
+      // Reset status image container
+      if (statusImageContainer) {
+        statusImageContainer.classList.remove('editing');
       }
 
       // Reset parts editing
@@ -265,14 +281,34 @@ document.addEventListener('DOMContentLoaded', () => {
         headerUnitId.textContent = currentMarker.markerData.unitId;
       }
 
-      // Update current status display
+      // Update current status display and notes
       const currentStatusDisplay = document.getElementById('current-status-display');
+      const statusNotesTextarea = document.getElementById('status-notes');
+      const latestNotesDisplay = document.getElementById('latest-notes-display');
+        
       if (currentStatusDisplay) {
         currentStatusDisplay.textContent = currentMarker.markerData.status.toUpperCase();
         currentStatusDisplay.className = `status-text status-${currentMarker.markerData.status}`;
       }
 
-      // Show menu
+      // Clear and update status notes
+      if (statusNotesTextarea) {
+        statusNotesTextarea.value = currentMarker.markerData.notes || '';
+      }
+
+      if (latestNotesDisplay) {
+        latestNotesDisplay.textContent = currentMarker.markerData.notes ? 
+            `Notes: ${currentMarker.markerData.notes}` : '';
+        latestNotesDisplay.classList.toggle('has-notes', !!currentMarker.markerData.notes);
+      }
+
+      // Update status selection to match current marker
+      const unitStatusSelect = document.getElementById('unit-status');
+      if (unitStatusSelect) {
+        unitStatusSelect.value = currentMarker.markerData.status;
+      }
+
+      // Show menu and position it
       contextMenu.classList.remove('hidden');
 
       // Calculate position
@@ -306,12 +342,6 @@ document.addEventListener('DOMContentLoaded', () => {
       contextMenu.style.left = `${Math.max(10, left)}px`;
       contextMenu.style.top = `${Math.max(10, top)}px`;
       contextMenu.style.opacity = '1';
-
-      // Reset status selection
-      const unitStatusSelect = document.getElementById('unit-status');
-      if (unitStatusSelect) {
-        unitStatusSelect.value = currentMarker.markerData.status;
-      }
 
       // Refresh all panels
       populatePartsList();
@@ -501,7 +531,16 @@ document.addEventListener('DOMContentLoaded', () => {
       if (statusEditSection) {
         statusEditSection.classList.add('hidden');
       }
+      
+      // Store current lock state
+      const wasLocked = areMarkersLocked;
+      
       syncMarkerToFirebase(currentMarker);
+      
+      // Ensure marker stays locked if it was locked before
+      if (wasLocked) {
+        currentMarker.dragging.disable();
+      }
     });
   }
 
@@ -844,10 +883,20 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
       };
 
       if (marker.firebaseKey) {
-        markersRef.child(marker.firebaseKey).set(data);
+        markersRef.child(marker.firebaseKey).set(data)
+          .then(() => {
+            // After successful sync, ensure marker remains locked if markers are locked
+            if (areMarkersLocked) {
+              marker.dragging.disable();
+            }
+          });
       } else {
         const newMarkerRef = markersRef.push(data);
         marker.firebaseKey = newMarkerRef.key;
+        // Ensure new marker is locked if markers are locked
+        if (areMarkersLocked) {
+          marker.dragging.disable();
+        }
       }
       updateUnitList();
     } catch (error) {
@@ -890,7 +939,7 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
         li.className = 'unit-list-item';
         li.draggable = !isListLocked;
         li.dataset.position = marker.listPosition || 0;
-        li.dataset.unitKey = key; // Add the unit key as a data attribute
+        li.dataset.unitKey = key;
 
         li.innerHTML = `
           <span class="unit-id">${unitId}</span>
@@ -900,25 +949,35 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
           </button>
         `;
 
-        // Add click handler for the list item
+        // Update click handler for the list item
         li.addEventListener('click', (e) => {
           if (!e.target.classList.contains('delete-unit-btn')) {
             e.preventDefault();
             e.stopPropagation();
             
-            const unitKey = li.dataset.unitKey; // Get the unit key from the data attribute
+            const unitKey = li.dataset.unitKey;
             
             if (unitKey && markersMap.has(unitKey)) {
               const marker = markersMap.get(unitKey);
               currentMarker = marker;
 
-              const rect = li.getBoundingClientRect();
-              showContextMenu({
-                containerPoint: {
-                  x: rect.right,
-                  y: rect.top
-                }
+              // Pan and zoom to the marker with maximum zoom
+              map.setView(marker.getLatLng(), 20.25, {  
+                animate: true,
+                duration: 1
               });
+
+              // Show context menu
+              const markerPoint = map.latLngToContainerPoint(marker.getLatLng());
+              showContextMenu({
+                containerPoint: markerPoint
+              });
+
+              // Hide unit list panel
+              const unitListPanel = document.getElementById('unit-list-panel');
+              if (unitListPanel) {
+                unitListPanel.classList.remove('visible');
+              }
             }
           }
         });
