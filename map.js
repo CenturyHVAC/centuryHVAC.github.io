@@ -67,7 +67,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let rightClickPos = null; // Store position of right click
   let draggedItem = null; // Store the item being dragged
   let isListLocked = true; // List is locked by default
-  let areMarkersLocked = false; // Add this near the top with other state variables
+  let areMarkersLocked = true; // Add this near the top with other state variables
+  let editingPartIndex = -1; // Track index of part being edited
+  let currentMarker = null; // Track current marker for editing
 
   // Create right-click context menu
   const mapContextMenu = document.createElement('div');
@@ -160,13 +162,173 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Close context menu when clicking outside
   const contextMenu = document.getElementById('context-menu');
-  let currentMarker = null;
-  let isAddingMarker = false;
+  
+  function hideContextMenu() {
+    const contextMenu = document.getElementById('context-menu');
+    if (!contextMenu) return;
+
+    try {
+      // Reset all edit states
+      const statusEditSection = document.getElementById('status-edit-section');
+      const addPartsInput = document.getElementById('add-parts-input');
+      const showAddPartsBtn = document.getElementById('show-add-parts-btn');
+      const detailsGrid = document.querySelector('.details-grid');
+      const detailsDisplay = document.getElementById('details-display');
+      const editDetailsBtn = document.getElementById('edit-details-btn');
+      const saveDetailsBtn = document.getElementById('save-details-btn');
+
+      // Reset status editing
+      if (statusEditSection) {
+        statusEditSection.classList.add('hidden');
+      }
+
+      // Reset parts editing
+      if (addPartsInput) {
+        addPartsInput.classList.add('hidden');
+      }
+      if (showAddPartsBtn) {
+        showAddPartsBtn.classList.remove('hidden');
+      }
+
+      // Reset details editing
+      if (detailsGrid) {
+        detailsGrid.style.display = 'none';
+      }
+      if (detailsDisplay) {
+        detailsDisplay.style.display = 'block';
+      }
+      if (editDetailsBtn) {
+        editDetailsBtn.style.display = 'inline-block';
+      }
+      if (saveDetailsBtn) {
+        saveDetailsBtn.style.display = 'none';
+      }
+
+      // Reset input fields
+      const inputs = contextMenu.querySelectorAll('input, select, textarea');
+      inputs.forEach(input => {
+        if (input.type === 'text' || input.tagName === 'TEXTAREA') {
+          input.value = '';
+        }
+      });
+
+      // Reset status select to default
+      const unitStatusSelect = document.getElementById('unit-status');
+      if (unitStatusSelect) {
+        unitStatusSelect.selectedIndex = 0;
+      }
+
+      // Reset editing states
+      editingPartIndex = -1;
+
+      // Hide the menu
+      contextMenu.classList.add('hidden');
+      contextMenu.style.transform = 'translate3d(0px, 0px, 0px)'; // Reset position
+    } catch (error) {
+      console.error('Error hiding context menu:', error);
+    }
+  }
+
+  function showContextMenu(event) {
+    const contextMenu = document.getElementById('context-menu');
+    if (!currentMarker || !contextMenu) return;
+
+    // Hide any existing context menu
+    hideContextMenu();
+
+    try {
+      // Initialize marker data if needed
+      if (!currentMarker.markerData) {
+        currentMarker.markerData = {
+          unitId: 'UNIT-ID',
+          status: 'up',
+          notes: '',
+          statusImageUrl: '',
+          details: {
+            brand: '',
+            model: '',
+            serial: '',
+            mfgDate: '',
+            freonType: ''
+          },
+          parts: [],
+          history: {
+            status: [],
+            parts: []
+          }
+        };
+      }
+
+      // Update header with current unit ID
+      const headerUnitId = document.getElementById('header-unit-id');
+      if (headerUnitId) {
+        headerUnitId.textContent = currentMarker.markerData.unitId;
+      }
+
+      // Update current status display
+      const currentStatusDisplay = document.getElementById('current-status-display');
+      if (currentStatusDisplay) {
+        currentStatusDisplay.textContent = currentMarker.markerData.status.toUpperCase();
+        currentStatusDisplay.className = `status-text status-${currentMarker.markerData.status}`;
+      }
+
+      // Show menu
+      contextMenu.classList.remove('hidden');
+
+      // Calculate position
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const menuWidth = contextMenu.offsetWidth;
+      const menuHeight = contextMenu.offsetHeight;
+
+      let left, top;
+      if (event.containerPoint) {
+        left = event.containerPoint.x;
+        top = event.containerPoint.y;
+      } else if (event.originalEvent) {
+        left = event.originalEvent.pageX;
+        top = event.originalEvent.pageY;
+      } else {
+        const markerPos = map.latLngToContainerPoint(currentMarker.getLatLng());
+        left = markerPos.x;
+        top = markerPos.y;
+      }
+
+      // Adjust position to keep menu in viewport
+      if (left + menuWidth > viewportWidth) {
+        left = Math.max(0, viewportWidth - menuWidth - 10);
+      }
+      if (top + menuHeight > viewportHeight) {
+        top = Math.max(0, viewportHeight - menuHeight - 10);
+      }
+
+      // Set position and show menu
+      contextMenu.style.left = `${Math.max(10, left)}px`;
+      contextMenu.style.top = `${Math.max(10, top)}px`;
+      contextMenu.style.opacity = '1';
+
+      // Reset status selection
+      const unitStatusSelect = document.getElementById('unit-status');
+      if (unitStatusSelect) {
+        unitStatusSelect.value = currentMarker.markerData.status;
+      }
+
+      // Refresh all panels
+      populatePartsList();
+      populateDetailsTab();
+      updateStatusHistory();
+      updatePartsHistory();
+
+    } catch (error) {
+      console.error('Error showing context menu:', error);
+    }
+  }
 
   document.addEventListener('click', (e) => {
+    const contextMenu = document.getElementById('context-menu');
     const mapContextMenu = document.getElementById('map-context-menu');
     
-    // Check if the click is outside both context menus
+    // Check if the click is outside both context menus and not on a marker
     if (contextMenu && !contextMenu.contains(e.target) && 
         mapContextMenu && !mapContextMenu.contains(e.target)) {
       
@@ -176,18 +338,10 @@ document.addEventListener('DOMContentLoaded', () => {
       );
       
       if (!clickedOnMarker) {
-        contextMenu.classList.add('hidden');
-        currentMarker = null;
+        hideContextMenu();
       }
     }
   });
-
-  // Prevent context menu from propagating clicks
-  if (contextMenu) {
-    contextMenu.addEventListener('click', (e) => {
-      e.stopPropagation();
-    });
-  }
 
   // Load saved progress after map initialization
   function loadMapProgress() {
@@ -360,7 +514,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const addPartsInput = document.getElementById('add-parts-input');
   const partsList = document.getElementById('parts-list');
   const partsHistoryContainer = document.getElementById('parts-history');
-  let editingPartIndex = -1; // Track index of part being edited
 
   // Show add parts input
   showAddPartsBtn.addEventListener('click', () => {
@@ -376,7 +529,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const partNumber = partNumberInput.value.trim();
     const replacementDate = partReplacementDateInput.value;
 
-    if (partName && partNumber && currentMarker && currentMarker.markerData) {
+    if (partName && currentMarker && currentMarker.markerData) {
       const now = new Date();
 
       if (editingPartIndex !== -1) {
@@ -393,12 +546,12 @@ document.addEventListener('DOMContentLoaded', () => {
           name: partName,
           number: partNumber,
           replacementDate: replacementDate,
-          addedDate: now.toISOString() // Convert Date to ISO string
+          addedDate: now.toISOString()
         };
         
         currentMarker.markerData.parts.push(newPart);
         currentMarker.markerData.history.parts.unshift({
-          date: now.toISOString(), // Convert Date to ISO string
+          date: now.toISOString(),
           action: 'added',
           part: newPart
         });
@@ -412,7 +565,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showAddPartsBtn.classList.remove('hidden');
       populatePartsList();
       updatePartsHistory();
-      syncMarkerToFirebase(currentMarker); // Save state after updating parts
+      syncMarkerToFirebase(currentMarker);
     }
   });
 
@@ -481,7 +634,7 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
       // Hide editable grid, show details display
       detailsGrid.style.display = 'none';
       detailsDisplay.style.display = 'block';
-      syncMarkerToFirebase(currentMarker); // Save state after updating details
+      syncMarkerToFirebase(currentMarker);
     }
   });
 
@@ -490,13 +643,13 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
     if (currentMarker?.markerData?.parts) {
       currentMarker.markerData.parts.forEach((part, index) => {
         if (!part) return; // Skip if part is undefined
-      
+    
         const partEntry = document.createElement('li');
         partEntry.classList.add('part-entry');
         partEntry.innerHTML = `
           <div>
             <span class="part-name">${part.name || ''}</span>
-            <span class="part-number">(${part.number || ''})</span>
+            ${part.number ? `<span class="part-number">(${part.number})</span>` : ''}
             ${part.replacementDate ? `<span class="part-replacement-date">Replaced: ${part.replacementDate}</span>` : ''}
           </div>
           <div class="part-actions">
@@ -509,7 +662,8 @@ Freon Type:   ${currentMarker.markerData.details.freonType || 'N/A'}`.trim();
         // Add event listeners with error handling
         try {
           const deleteButton = partEntry.querySelector('.delete-part-btn');
-          deleteButton.addEventListener('click', () => {
+          deleteButton.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent event bubbling
             const partIndex = parseInt(deleteButton.dataset.partIndex, 10);
             if (!isNaN(partIndex) && partIndex >= 0 && partIndex < currentMarker.markerData.parts.length) {
               currentMarker.markerData.parts.splice(partIndex, 1);
@@ -610,128 +764,6 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
     }
   }
 
-  function showContextMenu(event) {
-    if (!currentMarker || !contextMenu) return;
-
-    try {
-      // Hide the unit list panel when context menu opens
-      const unitListPanel = document.getElementById('unit-list-panel');
-      if (unitListPanel) {
-        unitListPanel.classList.remove('visible');
-      }
-
-      // Initialize marker data if needed
-      if (!currentMarker.markerData) {
-        currentMarker.markerData = {
-          unitId: 'UNIT-ID',
-          status: 'up',
-          notes: '',
-          statusImageUrl: '',
-          details: {
-            brand: '',
-            model: '',
-            serial: '',
-            mfgDate: '',
-            freonType: ''
-          },
-          parts: [],
-          history: {
-            status: [],
-            parts: []
-          }
-        };
-      }
-
-      const headerUnitId = document.getElementById('header-unit-id');
-      if (headerUnitId) {
-        headerUnitId.textContent = currentMarker.markerData.unitId || 'UNIT-ID';
-      }
-
-      // Update status display
-      const currentStatusDisplay = document.getElementById('current-status-display');
-      if (currentStatusDisplay) {
-        currentStatusDisplay.textContent = (currentMarker.markerData.status || 'UP').toUpperCase();
-        currentStatusDisplay.className = `status-text status-${currentMarker.markerData.status || 'up'}`;
-      }
-
-      // Update notes
-      const statusNotesTextarea = document.getElementById('status-notes');
-      if (statusNotesTextarea) {
-        statusNotesTextarea.value = currentMarker.markerData.notes || '';
-      }
-
-      // Update latest notes display
-      const latestNotesDisplay = document.getElementById('latest-notes-display');
-      if (latestNotesDisplay) {
-        latestNotesDisplay.textContent = currentMarker.markerData.notes ? `Notes: ${currentMarker.markerData.notes}` : '';
-        latestNotesDisplay.classList.toggle('has-notes', !!currentMarker.markerData.notes);
-      }
-
-      // Update status image URL in edit field and display
-      const statusImageUrlInput = document.getElementById('status-image-url');
-      const statusImage = document.querySelector('.status-image');
-      
-      if (statusImageUrlInput) {
-        statusImageUrlInput.value = currentMarker.markerData.statusImageUrl || '';
-      }
-
-      if (statusImage) {
-        statusImage.src = currentMarker.markerData.statusImageUrl || 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTN3lFE1mgBbxtpLcZeDQVMNl-JX0w5cI6pzQ&s';
-      }
-
-      // Show menu
-      contextMenu.classList.remove('hidden');
-      contextMenu.style.opacity = '0';
-
-      // Calculate position
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      const menuWidth = contextMenu.offsetWidth;
-      const menuHeight = contextMenu.offsetHeight;
-
-      let left, top;
-      if (event.containerPoint) {
-        left = event.containerPoint.x;
-        top = event.containerPoint.y;
-      } else {
-        const markerPos = map.latLngToContainerPoint(currentMarker.getLatLng());
-        left = markerPos.x;
-        top = markerPos.y;
-      }
-
-      // Adjust position to keep menu in viewport
-      if (left + menuWidth > viewportWidth) {
-        left = Math.max(0, viewportWidth - menuWidth - 10);
-      }
-      if (top + menuHeight > viewportHeight) {
-        top = Math.max(0, viewportHeight - menuHeight - 10);
-      }
-
-      // Set position and show menu
-      contextMenu.style.left = `${Math.max(10, left)}px`;
-      contextMenu.style.top = `${Math.max(10, top)}px`;
-      contextMenu.style.opacity = '1';
-
-      // Refresh all panels
-      populatePartsList();
-      populateDetailsTab();
-      updateStatusHistory();
-      updatePartsHistory();
-
-    } catch (error) {
-      console.error('Error showing context menu:', error);
-    }
-  }
-
-  function hideContextMenu() {
-    contextMenu.classList.add('hidden');
-    addPartsInput.classList.add('hidden'); // Hide part input when context menu closes
-    showAddPartsBtn.classList.remove('hidden'); // Show "Add Part" button
-    editingPartIndex = -1; // Reset editing part index
-    saveNewPartBtn.textContent = 'Save Part'; // Reset button text
-  }
-
-  // Modify the history display functions to handle ISO date strings
   function updateStatusHistory() {
     if (currentMarker?.markerData?.history?.status) {
       try {
@@ -1088,7 +1120,9 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
       const key = snapshot.key;
       const data = snapshot.val();
       if (!markersMap.has(key)) {
-        createMarkerFromData(key, data);
+        const marker = createMarkerFromData(key, data);
+        // Ensure marker is locked on creation
+        marker.dragging.disable();
         updateUnitList();
       }
     });
@@ -1229,7 +1263,7 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
   // Function to create a marker
   function createMarkerFromData(key, data) {
     const marker = L.marker(data.latlng, {
-      draggable: !areMarkersLocked
+      draggable: false // Explicitly set draggable to false when creating
     }).addTo(map);
     
     marker.markerData = {
@@ -1254,7 +1288,18 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
     marker.firebaseKey = key;
     marker.listPosition = data.position || 0;
 
-    // Add drag end event listener
+    // Make sure dragging is disabled
+    marker.dragging.disable();
+
+    // Track if marker is being dragged
+    let isDragging = false;
+
+    // Add dragstart event listener
+    marker.on('dragstart', function() {
+      isDragging = true;
+    });
+
+    // Update drag end event listener
     marker.on('dragend', function(e) {
       if (!areMarkersLocked) {
         const newPos = e.target.getLatLng();
@@ -1267,41 +1312,62 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
           });
         }
       }
+      // Reset drag state after a short delay
+      setTimeout(() => {
+        isDragging = false;
+      }, 10);
     });
 
-    // Set a flag when drag starts
-    marker.on('dragstart', function() {
-      marker._isDragging = true;
-    });
-
-    // Reset flag and handle regular click
+    // Set marker click handler
     marker.on('click', function(e) {
       e.originalEvent.stopPropagation();
-      // Only show context menu if we're not dragging
-      if (!this._isDragging) {
+      // Only show context menu if not dragging
+      if (!isDragging) {
         currentMarker = this;
+        const containerPoint = map.latLngToContainerPoint(this.getLatLng());
         showContextMenu({
-          containerPoint: map.latLngToContainerPoint(marker.getLatLng())
+          containerPoint: containerPoint
         });
       }
-      // Reset the dragging flag after a short delay
-      setTimeout(() => {
-        this._isDragging = false;
-      }, 10);
     });
 
     setMarkerIcon(marker);
     markersMap.set(key, marker);
-    updateLockState();
     return marker;
   }
 
   function initializeMarkerLockToggle() {
     const markerLockToggle = document.getElementById('marker-lock-toggle');
     
+    // Set initial state to locked
+    areMarkersLocked = true;
+    
+    // Force all existing markers to be locked
+    markersMap.forEach(marker => {
+      marker.dragging.disable();
+    });
+    
+    // Update initial UI state to show locked
+    markerLockToggle.classList.add('locked');
+    markerLockToggle.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+      </svg>
+    `;
+    
     markerLockToggle.addEventListener('click', () => {
       areMarkersLocked = !areMarkersLocked;
       markerLockToggle.classList.toggle('locked');
+      
+      // Update all existing markers
+      markersMap.forEach(marker => {
+        if (areMarkersLocked) {
+          marker.dragging.disable();
+        } else {
+          marker.dragging.enable();
+        }
+      });
       
       // Update the lock icon
       markerLockToggle.innerHTML = areMarkersLocked ? `
@@ -1315,14 +1381,6 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
           <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
         </svg>
       `;
-
-      // Update all existing markers
-      markersMap.forEach(marker => {
-        marker.dragging.enable();
-        if (areMarkersLocked) {
-          marker.dragging.disable();
-        }
-      });
     });
   }
 
