@@ -70,6 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let areMarkersLocked = true; // Add this near the top with other state variables
   let editingPartIndex = -1; // Track index of part being edited
   let currentMarker = null; // Track current marker for editing
+  let globalHistoryList = [];
 
   // Create right-click context menu
   const mapContextMenu = document.createElement('div');
@@ -354,17 +355,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  document.addEventListener('click', (e) => {
+  document.addEventListener('click', (event) => {
     const contextMenu = document.getElementById('context-menu');
     const mapContextMenu = document.getElementById('map-context-menu');
+    const historyListPanel = document.getElementById('history-list-panel');
+    const unitListPanel = document.getElementById('unit-list-panel');
     
-    // Check if the click is outside both context menus and not on a marker
-    if (contextMenu && !contextMenu.contains(e.target) && 
-        mapContextMenu && !mapContextMenu.contains(e.target)) {
+    // Close history list if click is outside panel and toggle button
+    if (historyListPanel && !historyListPanel.contains(event.target) && 
+        !document.getElementById('history-list-toggle').contains(event.target)) {
+      historyListPanel.classList.remove('visible');
+    }
+    
+    // Close context menu and unit list if click is outside context menu, map context menu, and unit list panel
+    if (contextMenu && !contextMenu.contains(event.target) && 
+        mapContextMenu && !mapContextMenu.contains(event.target) && 
+        unitListPanel && !unitListPanel.contains(event.target) && 
+        !document.getElementById('unit-list-toggle').contains(event.target)) {
       
       // Only hide if the click was not on a marker
       const clickedOnMarker = Array.from(markersMap.values()).some(marker => 
-        marker.getElement() && marker.getElement().contains(e.target)
+        marker.getElement() && marker.getElement().contains(event.target)
       );
       
       if (!clickedOnMarker) {
@@ -541,6 +552,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (wasLocked) {
         currentMarker.dragging.disable();
       }
+      updateGlobalHistory();
     });
   }
 
@@ -605,6 +617,7 @@ document.addEventListener('DOMContentLoaded', () => {
       populatePartsList();
       updatePartsHistory();
       syncMarkerToFirebase(currentMarker);
+      updateGlobalHistory();
     }
   });
 
@@ -905,13 +918,43 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
   }
 
   function updateUnitCount() {
-    // Only count elements that are unit-list-items but not building-items
-    const count = document.querySelectorAll('.unit-list-item:not(.building-item)').length;
-    const unitCount = document.getElementById('unit-count');
-    if (unitCount) {
-      unitCount.textContent = `(${count})`;
-    }
+  // Count total units (excluding buildings)
+  const totalUnits = document.querySelectorAll('.unit-list-item:not(.building-item)').length;
+
+  // Count units by status
+  const upUnits = document.querySelectorAll('.unit-list-item:not(.building-item) .unit-list-status.status-up').length;
+  const downUnits = document.querySelectorAll('.unit-list-item:not(.building-item) .unit-list-status.status-down').length;
+  const limitedUnits = document.querySelectorAll('.unit-list-item:not(.building-item) .unit-list-status.status-limited').length;
+
+  // Update the total count for the "ALL" status
+  const totalCountElement = document.getElementById('unit-count-all');
+  if (totalCountElement) {
+    totalCountElement.innerHTML = `(${totalUnits})`;
+    totalCountElement.classList.remove('count-up', 'count-down', 'count-limited'); // Remove previous status classes
   }
+
+  // Update the count for the "UP" status
+  const upCountElement = document.getElementById('unit-count-up');
+  if (upCountElement) {
+    upCountElement.innerHTML = `(${upUnits})`;
+    upCountElement.classList.add('count-up');  // Add the "count-up" class
+  }
+
+  // Update the count for the "DOWN" status
+  const downCountElement = document.getElementById('unit-count-down');
+  if (downCountElement) {
+    downCountElement.innerHTML = `(${downUnits})`;
+    downCountElement.classList.add('count-down');  // Add the "count-down" class
+  }
+
+  // Update the count for the "LIMITED" status
+  const limitedCountElement = document.getElementById('unit-count-limited');
+  if (limitedCountElement) {
+    limitedCountElement.innerHTML = `(${limitedUnits})`;
+    limitedCountElement.classList.add('count-limited');  // Add the "count-limited" class
+  }
+}
+
 
   function updateUnitList() {
     const searchInput = document.getElementById('unit-search');
@@ -1197,6 +1240,7 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
         setMarkerIcon(marker);
         updateUnitList();
       }
+      updateGlobalHistory();
     });
 
     // Listen for marker deletions
@@ -1208,6 +1252,7 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
         markersMap.delete(key);
         updateUnitList();
       }
+      updateGlobalHistory();
     });
   }
 
@@ -1587,6 +1632,164 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
     });
   }
 
+  function updateHistoryList() {
+    const historyList = document.getElementById('history-list');
+    const searchTerm = document.getElementById('history-search')?.value.toLowerCase() || '';
+    const activeFilter = document.querySelector('.history-filter-btn.active')?.dataset.type || 'all';
+    const startDate = document.getElementById('history-date-start')?.value;
+    const endDate = document.getElementById('history-date-end')?.value;
+
+    historyList.innerHTML = '';
+
+    let filteredHistory = [...globalHistoryList];
+
+    // Apply date range filter if dates are selected
+    if (startDate || endDate) {
+      filteredHistory = filteredHistory.filter(entry => {
+        const entryDate = new Date(entry.date);
+        
+        if (startDate && endDate) {
+          return entryDate >= new Date(startDate) && entryDate <= new Date(endDate + 'T23:59:59');
+        } else if (startDate) {
+          return entryDate >= new Date(startDate);
+        } else if (endDate) {
+          return entryDate <= new Date(endDate + 'T23:59:59');
+        }
+        return true;
+      });
+    }
+
+    // Apply other filters
+    filteredHistory = filteredHistory.filter(entry => {
+      return (activeFilter === 'all' || entry.type === activeFilter) &&
+             (entry.unitId.toLowerCase().includes(searchTerm) ||
+              (entry.notes && entry.notes.toLowerCase().includes(searchTerm)));
+    });
+
+    filteredHistory.forEach(entry => {
+      const li = document.createElement('li');
+      li.className = 'history-item';
+    
+      const date = new Date(entry.date).toLocaleString();
+    
+      if (entry.type === 'status') {
+        li.innerHTML = `
+          <div class="history-item-header">
+            <span class="history-item-unit">${entry.unitId}</span>
+            <span class="history-item-type status">Status Update</span>
+          </div>
+          <div class="history-item-content">
+           <div class="status-text status-${entry.status}" style="margin-bottom: 8px;">
+    ${entry.status.toUpperCase()}
+</div>
+
+            ${entry.notes ? `<div class="history-item-notes">"${entry.notes}"</div>` : ''}
+          </div>
+          <div class="history-item-date">${date}</div>
+        `;
+      } else {
+        li.innerHTML = `
+          <div class="history-item-header">
+            <span class="history-item-unit">${entry.unitId}</span>
+            <span class="history-item-type parts">Parts Update</span>
+          </div>
+          <div class="history-item-content">
+            <div>${entry.action.toUpperCase()}: ${entry.part.name}</div>
+            ${entry.part.number ? `<div>Part #: ${entry.part.number}</div>` : ''}
+          </div>
+          <div class="history-item-date">${date}</div>
+        `;
+      }
+    
+      // Add click handler to navigate to unit
+      li.addEventListener('click', () => {
+        const marker = Array.from(markersMap.values()).find(m => m.markerData?.unitId === entry.unitId);
+        if (marker) {
+          currentMarker = marker;
+          map.setView(marker.getLatLng(), 20.25, {
+            animate: true,
+            duration: 1
+          });
+          showContextMenu({
+            containerPoint: map.latLngToContainerPoint(marker.getLatLng())
+          });
+          document.getElementById('history-list-panel').classList.remove('visible');
+        }
+      });
+    
+      historyList.appendChild(li);
+    });
+  }
+
+  document.getElementById('history-list-toggle').addEventListener('click', () => {
+    const historyListPanel = document.getElementById('history-list-panel');
+    historyListPanel.classList.toggle('visible');
+    
+    // Hide unit list if it's visible
+    document.getElementById('unit-list-panel').classList.remove('visible');
+    
+    // Update history list when showing panel
+    if (historyListPanel.classList.contains('visible')) {
+      updateGlobalHistory();
+    }
+  });
+
+  document.getElementById('history-search').addEventListener('input', updateHistoryList);
+
+  document.querySelectorAll('.history-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.history-filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      updateHistoryList();
+    });
+  });
+
+  const applyDateFilter = document.getElementById('apply-date-filter');
+  if (applyDateFilter) {
+    applyDateFilter.addEventListener('click', () => {
+      updateHistoryList();
+    });
+  }
+
+  function updateGlobalHistory() {
+    globalHistoryList = [];
+    
+    markersMap.forEach((marker, key) => {
+      const unitId = marker.markerData?.unitId || 'UNIT-ID';
+      
+      // Add status history
+      if (marker.markerData?.history?.status) {
+        marker.markerData.history.status.forEach(entry => {
+          globalHistoryList.push({
+            type: 'status',
+            unitId: unitId,
+            date: entry.date,
+            status: entry.status,
+            notes: entry.notes
+          });
+        });
+      }
+      
+      // Add parts history
+      if (marker.markerData?.history?.parts) {
+        marker.markerData.history.parts.forEach(entry => {
+          globalHistoryList.push({
+            type: 'parts',
+            unitId: unitId,
+            date: entry.date,
+            action: entry.action,
+            part: entry.part
+          });
+        });
+      }
+    });
+    
+    // Sort by date, most recent first
+    globalHistoryList.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    updateHistoryList();
+  }
+
   function initializeListLockToggle() {
     const toggleLockButton = document.getElementById('toggle-lock-button');
     const unitListItems = document.querySelectorAll('.unit-list-item');
@@ -1641,5 +1844,25 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
     }, 0);
   });
 
+  
+  initializeFirebaseListeners();
+  initializeBuildingsListener();
+  
   initializeListLockToggle();
+  initializeStatusFilters();
+
+const dateFilterContainer = document.getElementById('date-filter-container');
+if (dateFilterContainer) {
+  dateFilterContainer.classList.add('collapsed');
+}
+
+const collapsibleHeader = document.querySelector('#date-filter-container .collapsible-header');
+if (collapsibleHeader) {
+  collapsibleHeader.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dateFilterContainer.classList.toggle('collapsed');
+  });
+}
+
 });
