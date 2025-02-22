@@ -1442,6 +1442,7 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
 
   function initializeMarkerLockToggle() {
     const markerLockToggle = document.getElementById('marker-lock-toggle');
+    const rotationControl = document.getElementById('rotation-control');
     
     // Set initial state to locked
     areMarkersLocked = true;
@@ -1453,6 +1454,10 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
     
     // Update initial UI state to show locked
     markerLockToggle.classList.add('locked');
+    
+    // Initially hide rotation control since markers are locked
+    rotationControl.style.display = 'none';
+    
     markerLockToggle.innerHTML = `
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
@@ -1473,6 +1478,9 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
         }
       });
       
+      // Show/hide rotation control based on lock state
+      rotationControl.style.display = areMarkersLocked ? 'none' : 'block';
+      
       // Update the lock icon
       markerLockToggle.innerHTML = areMarkersLocked ? `
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1491,34 +1499,20 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
   initializeMarkerLockToggle();
 
   // Define custom icons
-  const greenIcon = L.icon({
-    iconUrl: 'https://i.postimg.cc/8zVGRn1G/Adobe-Express-file-1.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-    iconSize: [50, 50],     // Increased size
-    iconAnchor: [20, 40],   // Adjusted to center the icon
-    popupAnchor: [1, -34],
-    shadowSize: [0, 0]
-   // filter: hue-rotate(90deg) saturate(200%)
-    
+  const createCustomIcon = (iconUrl) => {
+  return L.divIcon({
+    className: "custom-marker",
+    html: `<img src="${iconUrl}" class="marker-icon">`, // Using CSS class
+    iconAnchor: [20, 40], 
+    popupAnchor: [1, -34]
   });
+};
 
-  const redIcon = L.icon({
-    iconUrl: 'https://i.postimg.cc/8zVGRn1G/Adobe-Express-file-1.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-    iconSize: [50, 50],     // Increased size
-    iconAnchor: [20, 40],   // Adjusted to center the icon
-    popupAnchor: [1, -34],
-    shadowSize: [0, 0]
-  });
+// Define icons using the function
+const greenIcon = createCustomIcon('https://i.postimg.cc/8zVGRn1G/Adobe-Express-file-1.png');
+const redIcon = createCustomIcon('https://i.postimg.cc/8zVGRn1G/Adobe-Express-file-1.png');
+const yellowIcon = createCustomIcon('https://i.postimg.cc/8zVGRn1G/Adobe-Express-file-1.png');
 
-  const yellowIcon = L.icon({
-    iconUrl: 'https://i.postimg.cc/8zVGRn1G/Adobe-Express-file-1.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-    iconSize: [50, 50],     // Increased size
-    iconAnchor: [20, 40],   // Adjusted to center the icon
-    popupAnchor: [1, -34],
-    shadowSize: [0, 0]
-  });
 
   // Function to set marker icon based on status
   function setMarkerIcon(marker) {

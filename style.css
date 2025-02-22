@@ -15,11 +15,14 @@ body, html {
   left: 0;
 }
 
+
+
 /* Unit List Styles */
 #unit-list-toggle {
+  
+   top: calc(10px + 4 * 80px);
   position: absolute;
-  left: 10px;
-  top: calc(10px + 4 * 42px);
+  left: 15px;
   z-index: 1000;
   padding: 10px;
   border-radius: 4px;
@@ -28,6 +31,9 @@ body, html {
   cursor: pointer;
   box-shadow: -2px 0 5px rgba(0, 0, 0, 0.5);
   height: 38px;
+  transform: scale(1.5);
+  transform-origin: center;
+  opacity: 0.9;
 }
 
 #unit-list-toggle:hover {
@@ -141,8 +147,9 @@ body, html {
 
 /* History List Styles */
 #history-list-toggle {
+  top: calc(10px + 4 * 100px);
   position: absolute;
-  left: 10px;
+  left: 15px;
   z-index: 1000;
   padding: 10px;
   border-radius: 4px;
@@ -151,6 +158,9 @@ body, html {
   cursor: pointer;
   box-shadow: -2px 0 5px rgba(0, 0, 0, 0.5);
   height: 38px;
+  transform: scale(1.5);
+  transform-origin: center;
+  opacity: 0.9;
 }
 
 #history-list-toggle:hover {
@@ -308,11 +318,7 @@ body, html {
   max-width: 400px;
   text-align: center;
   opacity: 0.1;
-  transition: opacity 0.3s ease;
-}
-
-#rotation-control:hover, #rotation-control:focus-within {
-  opacity: 0.6;
+  transition: opacity 0.3s ease, display 0.3s ease;
 }
 
 #rotation-slider {
@@ -328,6 +334,56 @@ body, html {
   border-radius: 5px;
   margin-bottom: 10px;
   display: inline-block;
+}
+
+/* Leaflet Rotate Control Styling */
+.leaflet-control-rotate {
+  background-color: white !important;
+  border: none !important;
+  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.5) !important;
+  top: calc(10px + 4 * 20px);
+  left: 3px;
+  display:none;
+}
+
+
+.leaflet-control-rotate a {
+  background-color: white !important;
+  border: none !important;
+  width: 38px !important;
+  height: 38px !important;
+  line-height: 38px !important;
+  color: #333 !important;
+  font-size: 18px !important;
+  text-align: center !important;
+  text-decoration: none !important;
+  transition: background-color 0.2s !important;
+   transform: scale(1.5);
+  transform-origin: center;
+  
+}
+
+.leaflet-control-rotate a:hover {
+  background-color: #f0f0f0 !important;
+  color: #000 !important;
+}
+
+.leaflet-control-rotate.leaflet-bar {
+  border-radius: 4px !important;
+}
+
+.leaflet-control-rotate.leaflet-bar a {
+  border-radius: 4px !important;
+}
+
+.leaflet-control-rotate.leaflet-bar a:first-child {
+  border-top-left-radius: 4px !important;
+  border-top-right-radius: 4px !important;
+}
+
+.leaflet-control-rotate.leaflet-bar a:last-child {
+  border-bottom-left-radius: 4px !important;
+  border-bottom-right-radius: 4px !important;
 }
 
 /* Context Menu Styles */
@@ -517,21 +573,25 @@ body, html {
 .marker-context-menu li:hover {
   background-color: #f8d7da;
 }
+.marker-icon {
+  width: 50px; /* Adjust size as needed */
+  height: 50px;
+}
 
 /* Tooltip Styles */
 .custom-tooltip1 {
   margin-top: 12px;
-  margin-left: 15px;
+  margin-left: 18px;
   font-weight: bold;
-  color: green;
   background: transparent ;
   padding: 0;
   border-radius: 2px;
   border: none;
-  font-size: 9px;
+  font-size: 7px;
   text-transform: uppercase;
   height: 100%;
   width: 100%;
+  
 }
 
 .custom-tooltip1::before {
@@ -553,35 +613,6 @@ body, html {
   display: none !important;
 }
 
-/* Status Filter Styles */
-.status-filter {
-  padding: 10px 15px;
-  background-color: #f8f9fa;
-  border-bottom: 1px solid #dee2e6;
-  display: flex;
-  gap: 5px;
-}
-
-.status-filter-btn {
-  padding: 4px 8px;
-  border: 1px solid #dee2e6;
-  border-radius: 4px;
-  background: white;
-  cursor: pointer;
-  font-size: 0.85em;
-  transition: all 0.2s;
-  flex: 1;
-}
-
-.status-filter-btn:hover {
-  background-color: #f0f0f0;
-}
-
-.status-filter-btn.active {
-  background-color: #e9ecef;
-  border-color: #ced4da;
-  font-weight: bold;
-}
 
 
 
@@ -629,7 +660,11 @@ body, html {
 
 /* Zoom Control Styles */
 .leaflet-control-zoom {
-  margin-top: 10px;
+   transform: scale(1.8);
+  transform-origin: center;
+  top: 50px;
+  left: 4px;
+  opacity: 0.9;
 }
 
 /* Add/Building Container Styles */
@@ -652,37 +687,13 @@ body, html {
   height: 23px;
 }
 
-/* Lock Toggle Button Styles */
-#toggle-lock-button {
-  background-color: #f8f9fa;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  cursor: pointer;
-  padding: 5px 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #666;
-  transition: all 0.2s ease;
-  height: 34px;
-  min-width: 34px;
-}
 
-#toggle-lock-button:hover {
-  background-color: #e9ecef;
-  color: #333;
-}
-
-#toggle-lock-button svg {
-  width: 16px;
-  height: 16px;
-}
 
 /* Lock Markers Button Styles */
 #marker-lock-toggle {
+  top: calc(10px + 4 * 120px);
   position: absolute;
-  left: 10px;
-  top: calc(10px + 4 * 54px); /* Position it below the unit list toggle */
+  left: 15px;
   z-index: 1000;
   padding: 10px;
   border-radius: 4px;
@@ -691,10 +702,10 @@ body, html {
   cursor: pointer;
   box-shadow: -2px 0 5px rgba(0, 0, 0, 0.5);
   height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background-color 0.2s;
+  transform: scale(1.5);
+  transform-origin: center;
+  opacity: 0.9;
+  
 }
 
 #marker-lock-toggle:hover {
@@ -879,13 +890,13 @@ body, html {
 /* Media Queries */
 @media (max-width: 768px) {
   #unit-list-panel {
-    width: 50%;
-    max-width: 50%;
+    width: 80%;
+    max-width: 80%;
     right: -100%;
   }
   #history-list-panel {
-  width: 50%;
-    max-width: 50%;
+  width: 80%;
+    max-width: 80%;
     right: -100%;
 }
 
@@ -896,6 +907,53 @@ body, html {
   #unit-list-panel.visible {
     right: 0;
   }
+  #unit-list-toggle {
+  top: calc(10px + 4 * 20px);
+  opacity: 0.5;
+    left: 1px;
+  }
+  
+  
+  #history-list-toggle{
+    top: calc(10px + 4 * 40px);
+  opacity: 0.5;
+     left: 1px;
+  }
+  
+  #marker-lock-toggle{
+    top: calc(10px + 4 * 60px);
+    opacity: 0.5;
+   left: 1px;
+  }
+.leaflet-control-zoom {
+  display:none;
+}
+.marker-icon {
+  width: 40px; /* Adjust size as needed */
+  height: 40px;
+}
+
+/* Tooltip Styles */
+.custom-tooltip1 {
+  margin-top: 9px;
+  margin-left: 9px;
+  font-weight: bold;
+  background: transparent ;
+  padding: 0;
+  border-radius: 2px;
+  border: none;
+  font-size: 7px;
+  text-transform: uppercase;
+  height: 100%;
+  width: 100%;
+  filter: opacity(75%);
+  
+}
+  
+  
+  }
+}
+  
 
 
 
@@ -1564,17 +1622,6 @@ body, html {
     width: 100%;
   }
 }
-.status-filter {
-  display: flex;
-  gap: 8px; /* Adds space between each group of button and counter */
-  justify-content: center; /* Aligns items to the left */
-}
-
-.status-filter-group {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
 
 .unit-count {
   font-size: 1em;
@@ -1594,14 +1641,55 @@ body, html {
   color: #ff9800;
 }
 
+
+
+
+/* Status Filter Styles */
+
+
+
+
+.status-filter-btn:hover {
+  background-color: #f0f0f0;
+}
+
+.status-filter-btn.active {
+  background-color: #e9ecef;
+  border-color: #ced4da;
+  font-weight: bold;
+}
+
+
+.status-filter {
+  
+  padding: 10px ;
+  display: flex;
+  width: 94%;
+  gap: 5px; /* Adds space between each group of button and counter */
+  justify-content: center; /* Aligns items to the left */
+  border-bottom: 5px solid #dee2e6;
+}
+
 .status-filter-btn {
+  
+  width: 100%;
+  border-radius: 4px;
   background-color: #f8f9fa;
-  border: 1px solid #ccc;
+  border: 1.5px solid #ccc;
   padding: 10px 10px;
   cursor: pointer;
   text-align: center;
-  max-width: 120px; /* Limit the width of each button */
   white-space: nowrap; /* Prevents text from wrapping */
+  font-size: 0.85em;
+  transition: all 0.2s;
+  flex: 1;
+}
+
+.status-filter-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-grow: 1;
 }
 
 .status-filter-btn.status-up {
@@ -1618,11 +1706,6 @@ body, html {
   background-color: #ff9800;
   color: white;
 }
-
-
-
-
-
 
 #date-filter-container {
   border-bottom: 1px solid #dee2e6;
