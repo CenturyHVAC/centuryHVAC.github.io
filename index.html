@@ -55,6 +55,12 @@
       <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
     </svg>
   </button>
+  <button id="marker-controls-toggle" title="Toggle marker controls" >
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"></circle>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+    </svg>
+  </button>
 
   <div id="map"></div>
   <div id="unit-list-panel">
@@ -227,10 +233,7 @@
         </div>
       </div>
       <div id="details-tab" class="tab-panel">
-        <div class="details-actions">
-          <button id="edit-details-btn" class="btn btn-secondary">Edit Details</button>
-          <button id="save-details-btn" class="btn btn-primary" style="display: none;">Save Details</button>
-        </div>
+   
         <div class="details-display" id="details-display"></div>
         <div class="details-grid" style="display: none;">
           <label for="unit-brand">Brand:</label>
@@ -255,6 +258,10 @@
             <option value="Other">Other</option>
           </select>
         </div>
+         <div class="details-actions">
+          <button id="edit-details-btn" class="btn btn-secondary">Edit Details</button>
+          <button id="save-details-btn" class="btn btn-primary" style="display: none;">Save Details</button>
+        </div>
       </div>
       <div id="history-tab" class="tab-panel">
         <div id="status-history" class="scrollable-history"></div>
@@ -276,64 +283,63 @@
 
       if (contextMenu && contextMenuHeader) {
         let isDragging = false;
-        let currentX;
-        let currentY;
-        let initialX;
-        let initialY;
-        let xOffset = 0;
-        let yOffset = 0;
+        let startX;
+        let startY;
+        let startMenuX;
+        let startMenuY;
 
         contextMenuHeader.addEventListener('mousedown', dragStart);
-        contextMenuHeader.addEventListener('touchstart', dragStart);
         document.addEventListener('mousemove', drag);
-        document.addEventListener('touchmove', drag);
         document.addEventListener('mouseup', dragEnd);
-        document.addEventListener('touchend', dragEnd);
 
         function dragStart(e) {
-          if (e.type === 'touchstart') {
-            initialX = e.touches[0].clientX - xOffset;
-            initialY = e.touches[0].clientY - yOffset;
-          } else {
-            initialX = e.clientX - xOffset;
-            initialY = e.clientY - yOffset;
-          }
-
-          if (e.target === contextMenuHeader) {
+          if (e.target === contextMenuHeader || contextMenuHeader.contains(e.target)) {
             isDragging = true;
+            contextMenu.classList.add('dragging');
+
+            // Get current menu position from transform or default to 0
+            const transform = window.getComputedStyle(contextMenu).transform;
+            let currentX = 0;
+            let currentY = 0;
+            
+            if (transform !== 'none') {
+              const matrix = new DOMMatrix(transform);
+              currentX = matrix.m41;
+              currentY = matrix.m42;
+            }
+
+            // Store initial positions
+            startX = e.clientX;
+            startY = e.clientY;
+            startMenuX = currentX;
+            startMenuY = currentY;
           }
         }
 
         function drag(e) {
+          if (!isDragging) return;
+
+          e.preventDefault();
+          
+          // Calculate new position based on mouse movement from start position
+          const dx = e.clientX - startX;
+          const dy = e.clientY - startY;
+          
+          const newX = startMenuX + dx;
+          const newY = startMenuY + dy;
+
+          // Apply new position
+          contextMenu.style.transform = `translate3d(${newX}px, ${newY}px, 0)`;
+        }
+
+        function dragEnd() {
           if (isDragging) {
-            e.preventDefault();
-
-            if (e.type === 'touchmove') {
-              currentX = e.touches[0].clientX - initialX;
-              currentY = e.touches[0].clientY - initialY;
-            } else {
-              currentX = e.clientX - initialX;
-              currentY = e.clientY - initialY;
-            }
-
-            xOffset = currentX;
-            yOffset = currentY;
-
-            setTranslate(currentX, currentY, contextMenu);
+            isDragging = false;
+            contextMenu.classList.remove('dragging');
           }
         }
 
-        function dragEnd(e) {
-          initialX = currentX;
-          initialY = currentY;
-
-          isDragging = false;
-        }
-
-        function setTranslate(xPos, yPos, el) {
-          el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
-        }
-
+        // Prevent text selection during drag
         contextMenuHeader.addEventListener('selectstart', (e) => {
           if (isDragging) {
             e.preventDefault();

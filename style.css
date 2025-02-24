@@ -386,6 +386,307 @@ body, html {
   border-bottom-right-radius: 4px !important;
 }
 
+/* Opacity Control Styles */
+
+#marker-controls {
+  display: none; 
+  transition: opacity 0.3s ease;
+}
+
+#marker-controls.visible {
+  display: flex;
+}
+
+#marker-controls-toggle:hover {
+  background-color: #f0f0f0;
+}
+
+#marker-controls-toggle{
+top: calc(10px + 4 * 140px);
+  position: absolute; 
+  left: 15px;
+  z-index: 1000;
+  padding: 10px; 
+  border-radius: 4px;
+  background-color: white; 
+  border: none; 
+  cursor: pointer; 
+  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.5); 
+  height: 38px; 
+  transform: scale(1.5); 
+  transform-origin: center; 
+  opacity: 0.9;
+}
+
+#marker-controls {
+
+	
+
+  position: absolute;
+
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+
+	
+
+  z-index: 1000;
+
+	
+
+  background-color: white;
+
+	
+
+  padding: 10px;
+
+	
+
+  border-radius: 4px;
+
+	
+
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+
+	
+
+  display: none;
+
+	
+
+  align-items: center;
+
+	
+
+  gap: 15px;
+
+	
+
+  width: auto;
+
+	
+
+  min-width: 300px;
+
+	
+
+  opacity: 0.9;
+
+	
+
+}
+
+	
+
+	
+
+.control-group {
+
+	
+
+  display: flex;
+
+	
+
+  align-items: center;
+
+	
+
+  gap: 10px;
+
+	
+
+  flex: 1;
+
+	
+
+}
+
+	
+
+	
+
+.control-group label {
+
+	
+
+  font-size: 0.9em;
+
+	
+
+  color: #666;
+
+	
+
+  white-space: nowrap;
+
+	
+
+}
+
+	
+
+	
+
+#opacity-slider,
+
+	
+
+#size-slider {
+
+	
+
+  flex: 1;
+
+	
+
+  width: 100%;
+
+	
+
+  height: 5px;
+
+	
+
+  -webkit-appearance: none;
+
+	
+
+  appearance: none;
+
+	
+
+  background: #ddd;
+
+	
+
+  outline: none;
+
+	
+
+  border-radius: 3px;
+
+	
+
+}
+
+	
+
+	
+
+#opacity-slider::-webkit-slider-thumb,
+
+	
+
+#size-slider::-webkit-slider-thumb {
+
+	
+
+  -webkit-appearance: none;
+
+	
+
+  appearance: none;
+
+	
+
+  width: 15px;
+
+	
+
+  height: 15px;
+
+	
+
+  border-radius: 50%;
+
+	
+
+  background: #4CAF50;
+
+	
+
+  cursor: pointer;
+
+	
+
+}
+
+	
+
+	
+
+#opacity-slider::-moz-range-thumb,
+
+	
+
+#size-slider::-moz-range-thumb {
+
+	
+
+  width: 15px;
+
+	
+
+  height: 15px;
+
+	
+
+  border-radius: 50%;
+
+	
+
+  background: #4CAF50;
+
+	
+
+  cursor: pointer;
+
+	
+
+  border: none;
+
+	
+
+}
+
+	
+
+	
+
+#opacity-value,
+
+	
+
+#size-value {
+
+	
+
+  min-width: 40px;
+
+	
+
+  text-align: center;
+
+	
+
+  font-size: 0.9em;
+
+	
+
+  color: #666;
+
+	
+
+}
+
+	
+
+
+	
+
+
+
 /* Context Menu Styles */
 .context-menu {
   position: absolute;
@@ -574,44 +875,15 @@ body, html {
   background-color: #f8d7da;
 }
 .marker-icon {
-  width: 50px; /* Adjust size as needed */
-  height: 50px;
+  width: 40px; /* Adjust size as needed */
+  height: 40px;
 }
-
+.custom-marker .marker-icon {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block;  /* Ensure no extra space around the image */
+}
 /* Tooltip Styles */
-.custom-tooltip1 {
-  margin-top: 12px;
-  margin-left: 18px;
-  font-weight: bold;
-  background: transparent ;
-  padding: 0;
-  border-radius: 2px;
-  border: none;
-  font-size: 7px;
-  text-transform: uppercase;
-  height: 100%;
-  width: 100%;
-  
-}
-
-.custom-tooltip1::before {
-  display: none !important;
-}
-
-.custom-tooltip {
-  background: none !important;
-  border: none !important;
-  box-shadow: none !important;
-  font-size: 24px !important;
-}
-
-.custom-tooltip .leaflet-tooltip-content {
-  text-align: center;
-}
-
-.custom-tooltip:before {
-  display: none !important;
-}
 
 
 
@@ -933,24 +1205,69 @@ body, html {
   height: 40px;
 }
 
-/* Tooltip Styles */
-.custom-tooltip1 {
-  margin-top: 9px;
-  margin-left: 9px;
-  font-weight: bold;
-  background: transparent ;
-  padding: 0;
-  border-radius: 2px;
-  border: none;
-  font-size: 7px;
-  text-transform: uppercase;
-  height: 100%;
-  width: 100%;
-  filter: opacity(75%);
-  
+  #marker-controls-toggle {
+    top: calc(10px + 4 * 80px);
+    opacity: 0.5;
+    left: 1px;
+  }
+  #marker-controls {
+
+	
+
+  position: absolute;
+
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+
+	
+
+  z-index: 1000;
+
+	
+
+  background-color: white;
+
+	
+
+  padding: 10px;
+
+	
+
+  border-radius: 4px;
+
+	
+
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+
+	
+
+  display: none;
+
+	
+
+  align-items: center;
+
+	
+
+  gap: 15px;
+
+	
+
+  width: auto;
+
+	
+
+  min-width: 100%;
+
+	
+
+  opacity: 0.9;
+
+	
+
 }
-  
-  
+
   }
 }
   
@@ -978,7 +1295,7 @@ body, html {
     left: 50%;
     transform: translateX(-50%);
   }
-
+  
   .context-menu {
     width: 95%;
     max-width: 350px;
@@ -987,6 +1304,8 @@ body, html {
     transform: translateX(-50%);
   }
 }
+
+
 
 /* Details Tab Styles */
 .details-grid {
