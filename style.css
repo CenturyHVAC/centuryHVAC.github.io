@@ -50,7 +50,7 @@ body, html {
   z-index: 999;
   transition: right 0.3s ease;
   box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
-  overflow-y: auto;
+ 
   border-left: 4px solid rgba(0, 0, 0, 0.1); /* Adjust thickness as needed */
   
   border-top-left-radius: 15px;  /* Adjust the value to control the curve size */
@@ -177,7 +177,7 @@ body, html {
   z-index: 999;
   transition: right 0.3s ease;
   box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
-  overflow-y: auto;
+ 
   border-left: 4px solid rgba(0, 0, 0, 0.1);
   border-top-left-radius: 15px;
 }
