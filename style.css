@@ -50,7 +50,7 @@ body, html {
   z-index: 999;
   transition: right 0.3s ease;
   box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
- 
+  overflow-x: auto;
   border-left: 4px solid rgba(0, 0, 0, 0.1); /* Adjust thickness as needed */
   
   border-top-left-radius: 15px;  /* Adjust the value to control the curve size */
@@ -177,7 +177,7 @@ body, html {
   z-index: 999;
   transition: right 0.3s ease;
   box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
- 
+ overflow-x: auto;
   border-left: 4px solid rgba(0, 0, 0, 0.1);
   border-top-left-radius: 15px;
 }
@@ -389,298 +389,119 @@ body, html {
 /* Opacity Control Styles */
 
 #marker-controls {
-  display: none; 
-  transition: opacity 0.3s ease;
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background-color: white;
+  padding: 10px;
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: auto;
+  min-width: 300px;
+  opacity: 0.9;
 }
 
 #marker-controls.visible {
   display: flex;
+  max-width: 85%; /* Minimum width of the container */
+  width: 90%; /* Ensures the container takes up full available width */
+  justify-content: center; /* Centers the content horizontally within the container */
+  align-items: center; /* Centers the content vertically within the container */
+  margin: 0 auto; /* Centers the container within its parent */
+  padding: 10px; /* Adds some padding for spacing */
+  background-color: white; /* Background color */
+  border-radius: 4px; /* Rounded corners */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* Subtle shadow for some depth */
 }
 
 #marker-controls-toggle:hover {
   background-color: #f0f0f0;
 }
 
-#marker-controls-toggle{
-top: calc(10px + 4 * 140px);
-  position: absolute; 
+#marker-controls-toggle {
+  top: calc(10px + 4 * 140px);
+  position: absolute;
   left: 15px;
   z-index: 1000;
-  padding: 10px; 
-  border-radius: 4px;
-  background-color: white; 
-  border: none; 
-  cursor: pointer; 
-  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.5); 
-  height: 38px; 
-  transform: scale(1.5); 
-  transform-origin: center; 
-  opacity: 0.9;
-}
-
-#marker-controls {
-
-	
-
-  position: absolute;
-
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-
-	
-
-  z-index: 1000;
-
-	
-
-  background-color: white;
-
-	
-
   padding: 10px;
-
-	
-
   border-radius: 4px;
-
-	
-
-  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-
-	
-
-  display: none;
-
-	
-
-  align-items: center;
-
-	
-
-  gap: 15px;
-
-	
-
-  width: auto;
-
-	
-
-  min-width: 300px;
-
-	
-
+  background-color: white;
+  border: none;
+  cursor: pointer;
+  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.5);
+  height: 38px;
+  transform: scale(1.5);
+  transform-origin: center;
   opacity: 0.9;
-
-	
-
 }
-
-	
-
-	
 
 .control-group {
-
-	
-
   display: flex;
-
-	
-
   align-items: center;
-
-	
-
-  gap: 10px;
-
-	
-
-  flex: 1;
-
-	
-
+  justify-content: center;
+  gap: 3px;
+  width: 100%; /* Ensures full width for centering */
+  text-align: center; /* Centers text elements */
 }
-
-	
-
-	
 
 .control-group label {
-
-	
-
   font-size: 0.9em;
-
-	
-
   color: #666;
-
-	
-
   white-space: nowrap;
-
-	
-
+  align-right: auto;
 }
-
-	
-
-	
 
 #opacity-slider,
-
-	
-
 #size-slider {
-
-	
-
-  flex: 1;
-
-	
-
-  width: 100%;
-
-	
-
+  width: 150px; /* Fixed width for centering */
   height: 5px;
-
-	
-
   -webkit-appearance: none;
-
-	
-
   appearance: none;
-
-	
-
   background: #ddd;
-
-	
-
   outline: none;
-
-	
-
   border-radius: 3px;
-
-	
-
 }
-
-	
-
-	
 
 #opacity-slider::-webkit-slider-thumb,
-
-	
-
 #size-slider::-webkit-slider-thumb {
-
-	
-
   -webkit-appearance: none;
-
-	
-
   appearance: none;
-
-	
-
   width: 15px;
-
-	
-
   height: 15px;
-
-	
-
   border-radius: 50%;
-
-	
-
-  background: #4CAF50;
-
-	
-
+  background: #007bff;
   cursor: pointer;
-
-	
-
 }
-
-	
-
-	
 
 #opacity-slider::-moz-range-thumb,
-
-	
-
 #size-slider::-moz-range-thumb {
-
-	
-
   width: 15px;
-
-	
-
   height: 15px;
-
-	
-
   border-radius: 50%;
-
-	
-
-  background: #4CAF50;
-
-	
-
+  background: #007bff;
   cursor: pointer;
-
-	
-
   border: none;
-
-	
-
 }
-
-	
-
-	
 
 #opacity-value,
-
-	
-
 #size-value {
-
-	
-
   min-width: 40px;
-
-	
-
   text-align: center;
-
-	
-
   font-size: 0.9em;
-
-	
-
   color: #666;
-
-	
-
 }
 
-	
+/* Ensure the button aligns to the right */
+#marker-controls-save-btn {
+  margin-left: auto;
+}
+
 
 
 	
@@ -1161,15 +982,21 @@ top: calc(10px + 4 * 140px);
 
 /* Media Queries */
 @media (max-width: 768px) {
-  #unit-list-panel {
-    width: 80%;
-    max-width: 80%;
-    right: -100%;
-  }
-  #history-list-panel {
+html, body {
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+  width: 100%;
+}
+
+#unit-list-panel, #history-list-panel {
   width: 80%;
-    max-width: 80%;
-    right: -100%;
+  max-width: 80%;
+  right: -80%;
+  position: fixed; /* Ensures the panel stays fixed */
+  top: 0;
+  height: 100vh; /* Makes it full height */
+  overflow-y: auto; /* Allows vertical scrolling if needed */
+  background-color: white; /* Add background to prevent content shifting */
+  box-shadow: -3px 0 5px rgba(0,0,0,0.2); /* Optional: Shadow effect */
 }
 
 #history-list-panel.visible {
@@ -1434,7 +1261,7 @@ top: calc(10px + 4 * 140px);
 
 .parts-list-container {
   max-height: 180px;
-  overflow-y: auto;
+  overflow-x: auto;
   border: 1px solid #eee;
   margin: 0 12px;
 }

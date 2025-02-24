@@ -1,3 +1,4 @@
+// Firebase configuration and initialization
 const firebaseConfig = {
   apiKey: "AIzaSyDXWogbfI_heWojtSOP9A-dnMVTm9R9ad4",
   authDomain: "centuryhvac-7a45d.firebaseapp.com",
@@ -1440,11 +1441,17 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
 
     const opacitySlider = document.getElementById('opacity-slider');
     const opacity = opacitySlider?.value || 100;
+    const size = document.getElementById('size-slider')?.value || 40;
+
     const markerIcon = marker.getElement();
     if (markerIcon) {
       markerIcon.style.opacity = opacity / 100;
+      const markerIconImg = markerIcon.querySelector('.marker-icon');
+      if (markerIconImg) {
+        markerIconImg.style.width = `${size}px`;
+        markerIconImg.style.height = `${size}px`;
+      }
     }
-
     setMarkerIcon(marker);
     markersMap.set(key, marker);
     return marker;
@@ -1508,104 +1515,205 @@ Freon Type:   ${details.freonType || 'N/A'}`.trim();
 
   initializeMarkerLockToggle();
 
-  // Define custom icons
-const createCustomIcon = (iconUrl) => {
-  // Get the size from the slider (default to 40 if the slider is undefined or empty)
-  const size = document.getElementById('size-slider')?.value || 40;
-
-  // Ensure the icon size and anchor point are centered based on the slider size
-  return L.divIcon({
-    className: "custom-marker",
-    html: `<img src="${iconUrl}" class="marker-icon" style="width:${size}px;height:${size}px;">`,
-    iconAnchor: [size / 2, size / 2],  // Anchor at the center of the marker
-    popupAnchor: [0, -size / 2]        // Popup above the marker
-  });
-};
-
-
-
-
-
-
+  // Create marker controls HTML section with new Save Settings button
+  const markerControls = document.createElement('div');
+  markerControls.id = 'marker-controls';
+  markerControls.innerHTML = `
+   
   
-// Function to set marker icon based on status
-function setMarkerIcon(marker) {
-  if (marker.markerData) {
-    let status = marker.markerData.status;
-    let icon;
+  <div class="control-group" 
+       style="display: flex; align-items: center; justify-content: center; width: 90%; gap: 5x;">
+    
+    <!-- Opacity Slider -->
+    <label style="text-align: center;">Opacity:</label>
+    <input type="range" id="opacity-slider" min="1" max="100" value="100" 
+      style="width: 30%; min-width: 40%;">
+    <span id="opacity-value" style="text-align: center;">100%</span>
 
-    // Add right-click handling for markers
-    marker.off('contextmenu'); // Remove any existing handler
-    marker.on('contextmenu', function(e) {
-      e.originalEvent.preventDefault(); // Prevent default right-click
+    <!-- Size Slider -->
+    <label style="text-align: center;">Size:</label>
+    <input type="range" id="size-slider" min="20" max="100" value="40" 
+      style="width: 30%; min-width: 40%;">
+    <span id="size-value" style="text-align: center;">40px</span>
 
-      // Create and show a simple marker context menu
-      let markerMenu = document.createElement('div');
-      markerMenu.className = 'marker-context-menu';
-      markerMenu.innerHTML = `
-        <ul>
-          <li id="delete-marker-option">Delete Marker</li>
-        </ul>
-      `;
-      
-      // Position menu at click location
-      markerMenu.style.left = e.originalEvent.pageX + 'px';
-      markerMenu.style.top = e.originalEvent.pageY + 'px';
-      
-      // Remove any existing marker menus
-      document.querySelectorAll('.marker-context-menu').forEach(menu => menu.remove());
-      
-      // Add menu to document
-      document.body.appendChild(markerMenu);
-      
-      // Handle delete option click
-      document.getElementById('delete-marker-option').addEventListener('click', () => {
-        if (marker.firebaseKey) {
-          markersRef.child(marker.firebaseKey).remove();
+  </div>
+
+  <button id="marker-controls-save-btn" class="btn" 
+    style="margin-top: 5px; align-self: flex-end;">Save Settings</button>
+</div>
+
+  `;
+  document.body.appendChild(markerControls);
+
+  // Retrieve control elements
+  const opacitySlider = document.getElementById('opacity-slider');
+  const opacityValue = document.getElementById('opacity-value');
+  const sizeSlider = document.getElementById('size-slider');
+  const sizeValue = document.getElementById('size-value');
+
+  // Load saved marker settings, if available
+  const savedOpacity = localStorage.getItem('markerOpacity');
+  const savedSize = localStorage.getItem('markerSize');
+  if (savedOpacity) {
+    opacitySlider.value = savedOpacity;
+    opacityValue.textContent = `${savedOpacity}%`;
+  }
+  if (savedSize) {
+    sizeSlider.value = savedSize;
+    sizeValue.textContent = `${savedSize}px`;
+  }
+
+  // Function to update markers based on slider values
+  function updateMarkers() {
+    markersMap.forEach(marker => {
+      const markerIcon = marker.getElement();
+      if (markerIcon) {
+        const opacity = opacitySlider.value / 100;
+        markerIcon.style.opacity = opacity;
+        
+        const size = sizeSlider.value;
+        const markerIconImg = markerIcon.querySelector('.marker-icon');
+        if (markerIconImg) {
+          markerIconImg.style.width = `${size}px`;
+          markerIconImg.style.height = `${size}px`;
         }
-        map.removeLayer(marker);
-        markersMap.delete(marker.firebaseKey);
-        markerMenu.remove();
-      });
-      
-      // Close menu when clicking elsewhere
-      document.addEventListener('click', function closeMenu(e) {
-        if (!markerMenu.contains(e.target)) {
-          markerMenu.remove();
-          document.removeEventListener('click', closeMenu);
-        }
-      });
+      }
     });
-
-    // Set the icon based on the marker's status
-    if (status === 'down') {
-      icon = createCustomIcon('https://i.postimg.cc/t4xb9vZc/down.png');
-    } else if (status === 'limited') {
-      icon = createCustomIcon('https://i.postimg.cc/J4HvXDrD/limited.png');
-    } else if (status === 'up') {
-      icon = createCustomIcon('https://i.postimg.cc/HkHJDmRn/UP.png');
-    } else {
-      icon = createCustomIcon('https://i.postimg.cc/HkHJDmRn/UP.png'); // Default to 'up' if status is unknown
-    }
-
-    // Set the icon
-    marker.setIcon(icon);
   }
 
-  const opacity = document.getElementById('opacity-slider')?.value || 100;
-  const size = document.getElementById('size-slider')?.value || 40;
+  // Event listeners for sliders
+  opacitySlider.addEventListener('input', (e) => {
+    const opacity = e.target.value;
+    opacityValue.textContent = `${opacity}%`;
+    updateMarkers();
+  });
 
-  const markerIcon = marker.getElement();
-  if (markerIcon) {
-    markerIcon.style.opacity = opacity / 100;
-    const markerIconImg = markerIcon.querySelector('.marker-icon');
-    if (markerIconImg) {
-      markerIconImg.style.width = `${size}px`;
-      markerIconImg.style.height = `${size}px`;
+  sizeSlider.addEventListener('input', (e) => {
+    const size = e.target.value;
+    sizeValue.textContent = `${size}px`;
+    updateMarkers();
+  });
+
+  // New: Save button event listener for marker controls
+  const markerControlsSaveBtn = document.getElementById('marker-controls-save-btn');
+  if (markerControlsSaveBtn) {
+    markerControlsSaveBtn.addEventListener('click', () => {
+      const opacity = opacitySlider.value;
+      const size = sizeSlider.value;
+      localStorage.setItem('markerOpacity', opacity);
+      localStorage.setItem('markerSize', size);
+      alert('Marker settings saved locally!');
+    });
+  }
+
+  // Toggle button for marker controls (existing code)
+  const markerControlsToggle = document.getElementById('marker-controls-toggle');
+  if (markerControlsToggle) {
+    markerControlsToggle.addEventListener('click', () => {
+      const markerControls = document.getElementById('marker-controls');
+      if (markerControls) {
+        markerControls.classList.toggle('visible');
+      }
+    });
+  }
+
+  // Function to set marker icon based on status
+  function setMarkerIcon(marker) {
+    if (marker.markerData) {
+      let status = marker.markerData.status;
+      let icon;
+
+      // Add right-click handling for markers
+      marker.off('contextmenu'); // Remove any existing handler
+      marker.on('contextmenu', function(e) {
+        e.originalEvent.preventDefault(); // Prevent default right-click
+
+        // Create and show a simple marker context menu
+        let markerMenu = document.createElement('div');
+        markerMenu.className = 'marker-context-menu';
+        markerMenu.innerHTML = `
+          <ul>
+            <li id="delete-marker-option">Delete Marker</li>
+          </ul>
+        `;
+        
+        // Position menu at click location
+        markerMenu.style.left = e.originalEvent.pageX + 'px';
+        markerMenu.style.top = e.originalEvent.pageY + 'px';
+        
+        // Remove any existing marker menus
+        document.querySelectorAll('.marker-context-menu').forEach(menu => menu.remove());
+        
+        // Add menu to document
+        document.body.appendChild(markerMenu);
+        
+        // Handle delete option click
+        document.getElementById('delete-marker-option').addEventListener('click', () => {
+          if (marker.firebaseKey) {
+            markersRef.child(marker.firebaseKey).remove();
+          }
+          map.removeLayer(marker);
+          markersMap.delete(marker.firebaseKey);
+          markerMenu.remove();
+        });
+        
+        // Close menu when clicking elsewhere
+        document.addEventListener('click', function closeMenu(e) {
+          if (!markerMenu.contains(e.target)) {
+            markerMenu.remove();
+            document.removeEventListener('click', closeMenu);
+          }
+        });
+      });
+
+      // Set the icon based on the marker's status
+      if (status === 'down') {
+        icon = L.divIcon({
+          className: "custom-marker",
+          html: `<img src="https://i.postimg.cc/t4xb9vZc/down.png" class="marker-icon" style="width:40px;height:40px;">`,
+          iconAnchor: [20, 20],
+          popupAnchor: [0, -20]
+        });
+      } else if (status === 'limited') {
+        icon = L.divIcon({
+          className: "custom-marker",
+          html: `<img src="https://i.postimg.cc/J4HvXDrD/limited.png" class="marker-icon" style="width:40px;height:40px;">`,
+          iconAnchor: [20, 20],
+          popupAnchor: [0, -20]
+        });
+      } else if (status === 'up') {
+        icon = L.divIcon({
+          className: "custom-marker",
+          html: `<img src="https://i.postimg.cc/HkHJDmRn/UP.png" class="marker-icon" style="width:40px;height:40px;">`,
+          iconAnchor: [20, 20],
+          popupAnchor: [0, -20]
+        });
+      } else {
+        icon = L.divIcon({
+          className: "custom-marker",
+          html: `<img src="https://i.postimg.cc/HkHJDmRn/UP.png" class="marker-icon" style="width:40px;height:40px;">`,
+          iconAnchor: [20, 20],
+          popupAnchor: [0, -20]
+        }); // Default to 'up' if status is unknown
+      }
+
+      // Set the icon
+      marker.setIcon(icon);
+    }
+
+    const opacity = document.getElementById('opacity-slider')?.value || 100;
+    const size = document.getElementById('size-slider')?.value || 40;
+
+    const markerIcon = marker.getElement();
+    if (markerIcon) {
+      markerIcon.style.opacity = opacity / 100;
+      const markerIconImg = markerIcon.querySelector('.marker-icon');
+      if (markerIconImg) {
+        markerIconImg.style.width = `${size}px`;
+        markerIconImg.style.height = `${size}px`;
+      }
     }
   }
-}
-
 
   // Helper function to handle undefined and null cases
   function safeGetMarkerData(marker) {
@@ -1851,79 +1959,6 @@ function setMarkerIcon(marker) {
       e.target.classList.add('dragging');
     }, 0);
   });
-
-  // Create the marker controls HTML only once
-  const markerControls = document.createElement('div');
-  markerControls.id = 'marker-controls';
-  markerControls.innerHTML = `
-    <div class="control-group">
-      <label>Opacity:</label>
-      <input type="range" id="opacity-slider" min="1" max="100" value="100">
-      <span id="opacity-value">100%</span>
-    </div>
-    <div class="control-group">
-      <label>Size:</label>
-      <input type="range" id="size-slider" min="20" max="100" value="40">
-      <span id="size-value">40px</span>
-    </div>
-  `;
-  document.body.appendChild(markerControls);
-
-  // Get control elements
-  const opacitySlider = document.getElementById('opacity-slider');
-  const opacityValue = document.getElementById('opacity-value');
-  const sizeSlider = document.getElementById('size-slider');
-  const sizeValue = document.getElementById('size-value');
-
-  // Function to update marker opacity and size
-  function updateMarkers() {
-    const markerControls = document.getElementById('marker-controls');
-    if (!markerControls?.classList.contains('visible')) return;
-
-    const opacitySlider = document.getElementById('opacity-slider');
-    const sizeSlider = document.getElementById('size-slider');
-
-    markersMap.forEach(marker => {
-      const markerIcon = marker.getElement();
-      if (markerIcon) {
-        // Update opacity
-        const opacity = opacitySlider?.value / 100 || 1;
-        markerIcon.style.opacity = opacity;
-        
-        // Update size
-        const size = sizeSlider?.value || 40;
-        const markerIconImg = markerIcon.querySelector('.marker-icon');
-        if (markerIconImg) {
-          markerIconImg.style.width = `${size}px`;
-          markerIconImg.style.height = `${size}px`;
-        }
-      }
-    });
-  }
-
-  // Add event listeners for both sliders
-  opacitySlider.addEventListener('input', (e) => {
-    const opacity = e.target.value;
-    opacityValue.textContent = `${opacity}%`;
-    updateMarkers();
-  });
-
-  sizeSlider.addEventListener('input', (e) => {
-    const size = e.target.value;
-    sizeValue.textContent = `${size}px`;
-    updateMarkers();
-  });
-
-  // Get toggle button and add click handler
-  const markerControlsToggle = document.getElementById('marker-controls-toggle');
-  if (markerControlsToggle) {
-    markerControlsToggle.addEventListener('click', () => {
-      const markerControls = document.getElementById('marker-controls');
-      if (markerControls) {
-        markerControls.classList.toggle('visible');
-      }
-    });
-  }
 
   initializeListLockToggle();
   initializeStatusFilters();
